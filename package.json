@@ -1,0 +1,44 @@
+{
+  "name": "chess-tree",
+  "version": "0.0.1",
+  "description": "Chess move tree manager, focused on editing/training opening/endgame books",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest src/* --watch",
+    "fmt": "prettier . --write",
+    "lint": "eslint src/**/* --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bendk/chess-tree.git"
+  },
+  "keywords": [
+    "chess",
+    "trainer",
+    "tree"
+  ],
+  "author": "Ben Dean-Kawamura",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bendk/chess-tree/issues"
+  },
+  "homepage": "https://github.com/bendk/chess-tree#readme",
+  "dependencies": {
+    "@jackstenglein/chess": "^1.0.58",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/uuid": "^9.0.8",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "jest": "^29.7.0",
+    "prettier": "3.2.5",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  }
+}
