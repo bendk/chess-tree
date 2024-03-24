@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { BookSummary, Move, MoveNode } from "./book";
+import { BookSummary, Move, MoveNode, Node } from "./book";
 
 /**
  * Training that's currently in-progress
@@ -62,31 +62,28 @@ export interface CurrentBook {
  * @field color which color is the user training?
  * @field initialMoves moves to get to this position (only populated for opening books)
  * @field initialPly ply of the first move for initialMoves
- * @field linesToGo remaining lines to train
+ * @field rootNode stores the remaining lines to train
  */
 export interface TrainingPosition {
   position: string;
   color: "w" | "b";
   initialMoves: string[];
   initialPly: number;
-  linesToGo: MoveNode[][];
+  rootNode: Node;
 }
 
 /**
  * Line of the current book the user is working on
  *
- * @field moves all moves/nodes for the line
- * @field index index of the current move
- * @field position fen for the position
+ * @field moves moves played so far
  * @field wrongMove last wrong move chosen by the user.
  *      Will be "<skipped>" if the user moves forward instead of choosing the correct move.
  *      This is cleared each time the user gets another choice.
  * @field history tracks how the user progressed through the line
- * @field position position the user is currently working on
+ * @field currentHistoryEntry CurrentLineHistoryEntry that we're building for the current move
  */
 export interface CurrentLine {
   moves: MoveNode[];
-  index: number;
   wrongMove: Move | null;
   history: CurrentLineHistoryEntry[];
   currentHistoryEntry: CurrentLineHistoryEntry;

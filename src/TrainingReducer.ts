@@ -7,9 +7,11 @@ import {
   Book,
   BookSummary,
   Move,
-  MoveNode,
   Node,
+  calcNodeInfo,
   childCount,
+  getDescendant,
+  updateChild,
 } from "./book";
 import {
   CurrentBook,
@@ -218,12 +220,9 @@ function calcNextStep(
       };
     }
   } else {
-    const currentPosition = currentBook.currentPosition;
     const currentLine = currentBook.currentLine;
-    if (
-      board.currentLineIndex >= currentLine.moves.length &&
-      (currentLine.wrongMove === null || currentLine.wrongMove === "<skipped>")
-    ) {
+    const currentNode = getCurrentNode(currentBook);
+    if (childCount(currentNode) == 0) {
       return {
         type: "show-line-summary",
         moves: currentLine.moves.map((n) => n.move),
@@ -231,18 +230,20 @@ function calcNextStep(
       };
     }
 
-    if (board.currentLineIndex < currentLine.index) {
+    if (board.currentLineIndex < currentLine.moves.length) {
+      // board.currentLineIndex is before the last item of `moves`. Tell the UI to animate through the moves.
       return { type: "move-board-forward-after-delay" };
-    } else if (board.color != currentPosition.color) {
+    } else if (board.color != currentBook.currentPosition.color) {
       if (currentLine.wrongMove === null) {
         return { type: "move-board-forward-after-delay" };
       } else {
         return {
           type: "show-correct-move",
-          move: currentLine.moves[currentLine.index - 1].move,
+          move: currentLine.moves.at(-1).move,
         };
       }
     } else {
+      // User needs to guess the move
       return { type: "choose-move", wrongMove: currentLine.wrongMove };
     }
   }
@@ -299,30 +300,38 @@ function handleMoveBoardForward(state: State, action: MoveBoardForward): State {
     return state;
   }
 
+  const currentBook = state.training.currentBook;
+  if (currentBook === null) {
+    throw Error(`TraningSession.reduce: Unknown action type: ${action}`);
+  }
+  const movingPastCurrentMoves =
+    state.board.currentLineIndex >= currentBook.currentLine.moves.length;
+  const userToMove = state.board.color == currentBook.currentPosition.color;
+  const userPlayedWrongMove = currentBook.currentLine.wrongMove !== null;
+
   // Clear the feedback, since the user did not make any move
   state = unsetBoardFeedback(state);
 
-  const currentBook = state.training.currentBook;
-  if (
-    currentBook !== null &&
-    state.board.currentLineIndex >= currentBook.currentLine.index
-  ) {
-    // User is moving forward to the next move
-    if (state.board.color != currentBook.currentPosition.color) {
+  if (movingPastCurrentMoves) {
+    // User is moving forward past the end of the current moves.
+    state = extendCurrentLineMoves(state);
+    if (adjustment == "count-as-correct") {
+      state = updateLastHistoryEntry(state, "correct");
+    } else if (adjustment == "ignore") {
+      state = updateLastHistoryEntry(state, null);
+    }
+
+    if (!userToMove) {
       // Moving past the opponent's move, clear wrongMove
       state = changeCurrentLine(state, (currentLine) => ({
         ...currentLine,
         wrongMove: null,
       }));
-    } else if (currentBook.currentLine.wrongMove === null) {
+    } else if (!userPlayedWrongMove) {
       // Skipping their move, set wrong move to "<skipped>"
       state = updateCurrentHistoryEntry(state, "incorrect", "<skipped>");
     }
-  }
-  if (adjustment == "count-as-correct") {
-    state = updateLastHistoryEntry(state, "correct");
-  } else if (adjustment == "ignore") {
-    state = updateLastHistoryEntry(state, null);
+    state = pushCurrentHistory(state);
   }
   state = advanceBoard(state);
   return state;
@@ -330,15 +339,12 @@ function handleMoveBoardForward(state: State, action: MoveBoardForward): State {
 
 function handleTryMove(state: State, action: TryMove): State {
   const { move } = action;
-
-  const training = state.training;
-  if (training.currentBook === null) {
-    throw Error("TrainingReducer.handleTryMove(): no current book");
-  }
-  const currentLine = training.currentBook.currentLine;
-  if (currentLine.moves[currentLine.index].move == move) {
-    // User chose the move correctly
-    if (currentLine.wrongMove === null) {
+  const userChoseWrong =
+    state.training.currentBook.currentLine.wrongMove !== null;
+  let correct: boolean;
+  [state, correct] = checkUserMove(state, move);
+  if (correct) {
+    if (!userChoseWrong) {
       // If it was the first guess, give them points
       state = updateCurrentHistoryEntry(state, "correct", null);
       state = setBoardFeedback(state, "correct", move);
@@ -346,6 +352,7 @@ function handleTryMove(state: State, action: TryMove): State {
       // If they guessed incorrectly before, remove the error feedback
       state = unsetBoardFeedback(state);
     }
+    state = pushCurrentHistory(state);
     state = advanceBoard(state);
   } else {
     // User chose incorrectly
@@ -359,38 +366,24 @@ function handleFinishCurrentLine(
   state: State,
   _action: FinishCurrentLine,
 ): State {
+  state = removeCurrentLineFromNode(state);
+  state = changeCurrentLine(state, (_currentLine) => newCurrentLine());
   let training = state.training;
   let board = state.board;
   const currentBook = training.currentBook;
-  if (currentBook === null) {
-    throw Error("TrainingReducer.handleFinishCurrentLine(): no current book");
-  }
-
   while (
-    currentBook.currentPosition.linesToGo.length == 0 &&
+    childCount(currentBook.currentPosition.rootNode) == 0 &&
     currentBook.positionsToGo.length > 0
   ) {
     [currentBook.currentPosition, ...currentBook.positionsToGo] =
       currentBook.positionsToGo;
   }
 
-  const [nextLineMoves, ...linesToGo] = currentBook.currentPosition.linesToGo;
-  if (nextLineMoves === undefined) {
+  if (childCount(currentBook.currentPosition.rootNode) == 0) {
     // Start a new book
     training = { ...training, currentBook: null };
   } else {
     // Start a new line
-    training = {
-      ...training,
-      currentBook: {
-        ...currentBook,
-        currentLine: newCurrentLine(nextLineMoves),
-        currentPosition: {
-          ...currentBook.currentPosition,
-          linesToGo,
-        },
-      },
-    };
     board = newTrainingBoard(currentBook.currentPosition);
   }
   // Regardless of which branch we took, we should update the line count
@@ -406,7 +399,7 @@ function newCurrentBook(training: Training, book: Book): CurrentBook | null {
   if (book.type === "opening") {
     currentPosition = {
       position: book.position,
-      linesToGo: shuffleArray(training, allLines(book.rootNode)),
+      rootNode: book.rootNode,
       color: book.color,
       initialPly: 0,
       initialMoves: book.initialMoves,
@@ -417,7 +410,7 @@ function newCurrentBook(training: Training, book: Book): CurrentBook | null {
       training,
       book.positions.map((p) => ({
         position: p.position,
-        linesToGo: shuffleArray(training, allLines(p.rootNode)),
+        rootNode: p.rootNode,
         color: p.color,
         initialPly: positionColor(p.position) == "w" ? 0 : 1,
         initialMoves: [],
@@ -425,24 +418,21 @@ function newCurrentBook(training: Training, book: Book): CurrentBook | null {
     );
   }
 
-  const firstLineMoves = currentPosition.linesToGo[0];
-  currentPosition.linesToGo = currentPosition.linesToGo.slice(1);
-  if (firstLineMoves === undefined) {
+  if (childCount(currentPosition.rootNode) === 0) {
     return null;
   } else {
     return {
       bookId: book.id,
       currentPosition,
       positionsToGo,
-      currentLine: newCurrentLine(firstLineMoves),
+      currentLine: newCurrentLine(),
     };
   }
 }
 
-function newCurrentLine(moves: MoveNode[]): CurrentLine {
+function newCurrentLine(): CurrentLine {
   return {
-    moves,
-    index: 0,
+    moves: [],
     wrongMove: null,
     history: [],
     currentHistoryEntry: {
@@ -478,12 +468,7 @@ function advanceBoard(state: State): State {
   let board = state.board;
   const currentMove = currentLine.moves[board.currentLineIndex];
   if (currentMove === undefined) {
-    // User is currently at the end of the line.  The only reason we should be allowing them
-    // to advance is if there's a wrong move that we're displaying, so clear it
-    return changeCurrentLine(state, (currentLine) => ({
-      ...currentLine,
-      wrongMove: null,
-    }));
+    throw Error("TrainingReducer.advanceBoard: moving past end of the line");
   }
 
   // Advance the board forward
@@ -504,19 +489,6 @@ function advanceBoard(state: State): State {
     comment: currentMove.comment ?? "",
   };
 
-  if (board.currentLineIndex > currentLine.index) {
-    state = changeCurrentLine(state, (currentLine) => {
-      return {
-        ...currentLine,
-        index: board.currentLineIndex,
-        history: [...currentLine.history, currentLine.currentHistoryEntry],
-        currentHistoryEntry: {
-          score: null,
-          otherMoves: [],
-        },
-      };
-    });
-  }
   return { ...state, board };
 }
 
@@ -579,6 +551,19 @@ function updateLastHistoryEntry(
   });
   state = updateCounts(state, oldScore, score);
   return state;
+}
+
+function pushCurrentHistory(state: State): State {
+  return changeCurrentLine(state, (currentLine) => {
+    return {
+      ...currentLine,
+      history: [...currentLine.history, currentLine.currentHistoryEntry],
+      currentHistoryEntry: {
+        score: null,
+        otherMoves: [],
+      },
+    };
+  });
 }
 
 function updateCounts(
@@ -661,35 +646,194 @@ function unsetBoardFeedback(state: State): State {
 }
 
 /**
- * Get all lines for a node
+ * Extend the moves for the current line
+ *
+ * This is called when the user moves past the end of the moves.  Pick a new move randomly, based on
+ * the total line counts of all children.  Note that this is valid both when we are picking a new
+ * move for the oppenent and also when the user skips over their own move.
  */
-function allLines(node: Node): MoveNode[][] {
-  // Special case a completed empty node
-  if (childCount(node) == 0) {
-    return [];
+function extendCurrentLineMoves(state: State): State {
+  const currentBook = state.training.currentBook;
+  if (currentBook === null) {
+    throw Error("TrainingReducer.extendCurrentLineMoves(): no current book");
   }
-  const allLines: MoveNode[][] = [];
-  const currentLine: MoveNode[] = [];
-  function visit(node: Node) {
-    if (childCount(node) == 0) {
-      allLines.push([...currentLine]);
-    } else {
-      for (const [move, child] of Object.entries(node.children)) {
-        currentLine.push({
-          ...child,
-          move,
-        });
-        visit(child);
-        currentLine.pop();
+  const currentNode = getCurrentNode(currentBook);
+  const allMoves = Object.keys(currentNode.children);
+  if (allMoves.length == 0) {
+    throw Error("TrainingReducer.extendCurrentLineMoves(): no moves to choose");
+  }
+  let move: Move;
+  if (state.training.shuffle) {
+    move = pickMoveRandomly(calcNodeInfo(currentNode).childLineCount);
+  } else {
+    move = allMoves[0];
+  }
+  const moveNode = { ...currentNode.children[move], move };
+
+  return changeCurrentLine(state, (currentLine) => ({
+    ...currentLine,
+    moves: [...currentLine.moves, moveNode],
+  }));
+}
+
+/**
+ * Check if the user's move is correct.
+ *
+ * Note: if there are multiple moves in the book than any of them is counted correct.
+ * Choosing one of the moves causes all other possibilities to be removed from the training session.
+ */
+function checkUserMove(state: State, userMove: Move): [State, boolean] {
+  const currentBook = state.training.currentBook;
+  if (currentBook === null) {
+    throw Error("TrainingReducer.checkUserMove(): no current book");
+  }
+  // Use `updateChild` to try to find the child node that matches the user move.
+  // If we find that, then remove all other moves for the node.
+  let childNode: Node;
+  const rootNode = updateChild(
+    currentBook.currentPosition.rootNode,
+    currentBook.currentLine.moves.map((m) => m.move),
+    (node) => {
+      childNode = node.children[userMove];
+      if (childNode !== undefined) {
+        return {
+          ...node,
+          children: {
+            [userMove]: childNode,
+          },
+        };
+      } else {
+        return node;
       }
+    },
+  );
+  // If we found the child node, then append it to the current moves
+  let moves = currentBook.currentLine.moves;
+  if (childNode) {
+    moves = [...moves, { ...childNode, move: userMove }];
+  }
+  state = {
+    ...state,
+    training: {
+      ...state.training,
+      currentBook: {
+        ...currentBook,
+        currentLine: {
+          ...currentBook.currentLine,
+          moves,
+        },
+        currentPosition: {
+          ...currentBook.currentPosition,
+          rootNode,
+        },
+      },
+    },
+  };
+  return [state, childNode !== undefined];
+}
+
+/**
+ * Remove the current line from the state.training.currentBook.currentPosition.rootNode
+ */
+function removeCurrentLineFromNode(state: State): State {
+  const currentBook = state.training.currentBook;
+  if (currentBook === null) {
+    throw Error("TrainingReducer.removeCurrentLineFromNode(): no current book");
+  }
+  let node = currentBook.currentPosition.rootNode;
+  let lastBranchIndex = -1;
+  currentBook.currentLine.moves.forEach((move, index) => {
+    if (childCount(node) > 1) {
+      lastBranchIndex = index;
+    }
+    node = node.children[move.move];
+    if (node === undefined) {
+      const moves = currentBook.currentLine.moves.map((m) => m.move).join(", ");
+      throw Error(
+        `TrainingReducer.removeCurrentLineFromNode(): current moves are illegal (${moves})`,
+      );
+    }
+  });
+
+  let rootNode: Node;
+  if (lastBranchIndex == -1) {
+    // No branches found, meaning this was the last branch
+    rootNode = {
+      ...currentBook.currentPosition.rootNode,
+      children: {},
+    };
+  } else {
+    const moveAfterBranch = currentBook.currentLine.moves[lastBranchIndex].move;
+    rootNode = updateChild(
+      currentBook.currentPosition.rootNode,
+      currentBook.currentLine.moves
+        .slice(0, lastBranchIndex)
+        .map((m) => m.move),
+      (node) => ({
+        ...node,
+        children: Object.fromEntries(
+          Object.entries(node.children).filter(
+            ([move, _node]) => move != moveAfterBranch,
+          ),
+        ),
+      }),
+    );
+  }
+  return {
+    ...state,
+    training: {
+      ...state.training,
+      currentBook: {
+        ...currentBook,
+        currentPosition: {
+          ...currentBook.currentPosition,
+          rootNode,
+        },
+      },
+    },
+  };
+}
+
+function getCurrentNode(currentBook: CurrentBook): Node {
+  const rootNode = currentBook.currentPosition.rootNode;
+  const descendant = getDescendant(
+    rootNode,
+    currentBook.currentLine.moves.map((m) => m.move),
+  );
+  if (descendant === null) {
+    throw Error("TrainingReducer.getCurrentNode(): descendent not found");
+  }
+  return descendant;
+}
+
+/**
+ * Pick a move randomly, but with each move having a different weight
+ *
+ * Used to pick a random move from a node, where each weight is the number of lines for that move.
+ */
+function pickMoveRandomly(moveMap: Record<string, number>): string {
+  const moves = Object.keys(moveMap);
+  if (moves.length == 0) {
+    throw Error("TrainingReducer.pickMove(): no moves to pick from");
+  }
+  const totalWeight = Object.values(moveMap).reduce((a, b) => a + b, 0);
+  let choice = Math.floor(Math.random() * totalWeight);
+
+  for (const [move, weight] of Object.entries(moveMap)) {
+    if (choice < weight) {
+      return move;
+    } else {
+      choice -= weight;
     }
   }
-  visit(node);
-  return allLines;
+  // We should never get here if Math.random() is correct, but if so just return an arbitrary move
+  return moves[0];
 }
 
 /**
  * Implementation of Durstenfeld shuffle
+ *
+ * Used to shuffle books and endgame positions when training
  *
  * From: https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
  */
