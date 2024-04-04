@@ -36,8 +36,12 @@ export {
     viewNodeTree,
 } from "./viewTree";
 export {
+    CurrentBook,
+    CurrentLine,
+    CurrentLineHistoryEntry,
     Training,
     TrainingActivity,
+    TrainingPosition,
     TrainingSelection,
     TrainingSelectionAll,
     TrainingSelectionOpening,
