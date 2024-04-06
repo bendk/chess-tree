@@ -91,25 +91,31 @@ function calcNextStep(training, booksToGo, board) {
     }
 }
 function reduce(state, action) {
+    let newState;
     if (action.type == "load-book") {
-        state = handleLoadBook(state, action);
+        newState = handleLoadBook(state, action);
     }
     else if (action.type == "move-board-forward") {
-        state = handleMoveBoardForward(state, action);
+        newState = handleMoveBoardForward(state, action);
     }
     else if (action.type == "try-move") {
-        state = handleTryMove(state, action);
+        newState = handleTryMove(state, action);
     }
     else if (action.type == "finish-current-line") {
-        state = handleFinishCurrentLine(state, action);
+        newState = handleFinishCurrentLine(state, action);
     }
     else {
         throw Error(`TraningSession.reduce: Unknown action type: ${action}`);
     }
-    return {
-        ...state,
-        nextStep: calcNextStep(state.training, state.booksToGo, state.board),
-    };
+    if (newState === state) {
+        return state;
+    }
+    else {
+        return {
+            ...newState,
+            nextStep: calcNextStep(newState.training, newState.booksToGo, newState.board),
+        };
+    }
 }
 exports.reduce = reduce;
 function handleLoadBook(state, action) {

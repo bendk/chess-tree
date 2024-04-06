@@ -743,10 +743,10 @@ test("moves at the wrong time", () => {
     expect(state.nextStep.type).toEqual("move-board-forward-after-delay");
     expect(
         TrainingReducer.reduce(state, { type: "try-move", move: "Nf6" }),
-    ).toEqual(state);
+    ).toBe(state);
     expect(
         TrainingReducer.reduce(state, { type: "try-move", move: "a6" }),
-    ).toEqual(state);
+    ).toBe(state);
     // Also when we're showing the correct move
     state = TrainingReducer.reduce(state, {
         type: "move-board-forward",
@@ -757,10 +757,10 @@ test("moves at the wrong time", () => {
     expect(state.nextStep.type).toEqual("show-correct-move");
     expect(
         TrainingReducer.reduce(state, { type: "try-move", move: "d4" }),
-    ).toEqual(state);
+    ).toBe(state);
     expect(
         TrainingReducer.reduce(state, { type: "try-move", move: "O-O" }),
-    ).toEqual(state);
+    ).toBe(state);
     // Also when we're showing the line summary
     state = TrainingReducer.reduce(state, {
         type: "move-board-forward",
@@ -770,5 +770,5 @@ test("moves at the wrong time", () => {
     expect(state.nextStep.type).toEqual("show-line-summary");
     expect(
         TrainingReducer.reduce(state, { type: "try-move", move: "exd4" }),
-    ).toEqual(state);
+    ).toBe(state);
 });
