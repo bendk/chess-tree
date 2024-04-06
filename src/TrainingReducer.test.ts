@@ -720,3 +720,55 @@ test("skipping moves", () => {
         history: buildHistory("=", "-", "=", "-"),
     });
 });
+
+test("moves at the wrong time", () => {
+    let state = TrainingReducer.initialState(
+        newTraining(books, { type: "all" }, false),
+        books,
+    );
+    checkState({
+        state,
+        nextStep: { type: "book-needed", bookId: ruyLopez.id },
+        correct: 0,
+        incorrect: 0,
+        linesTrained: 0,
+        currentLineIndex: 0,
+        history: undefined,
+    });
+    state = TrainingReducer.reduce(state, {
+        type: "load-book",
+        book: ruyLopez,
+    });
+    // When we're moving the board forward, any move attempt should be ignored
+    expect(state.nextStep.type).toEqual("move-board-forward-after-delay");
+    expect(
+        TrainingReducer.reduce(state, { type: "try-move", move: "Nf6" }),
+    ).toEqual(state);
+    expect(
+        TrainingReducer.reduce(state, { type: "try-move", move: "a6" }),
+    ).toEqual(state);
+    // Also when we're showing the correct move
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 0,
+    });
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "d4" });
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "O-O" });
+    expect(state.nextStep.type).toEqual("show-correct-move");
+    expect(
+        TrainingReducer.reduce(state, { type: "try-move", move: "d4" }),
+    ).toEqual(state);
+    expect(
+        TrainingReducer.reduce(state, { type: "try-move", move: "O-O" }),
+    ).toEqual(state);
+    // Also when we're showing the line summary
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 2,
+    });
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "d4" });
+    expect(state.nextStep.type).toEqual("show-line-summary");
+    expect(
+        TrainingReducer.reduce(state, { type: "try-move", move: "exd4" }),
+    ).toEqual(state);
+});

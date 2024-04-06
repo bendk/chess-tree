@@ -338,6 +338,10 @@ function handleMoveBoardForward(state: State, action: MoveBoardForward): State {
 }
 
 function handleTryMove(state: State, action: TryMove): State {
+    if (state.nextStep.type != "choose-move") {
+        // Ignore move attempts when it's not the user's turn to move.
+        return state;
+    }
     const { move } = action;
     const userChoseWrong =
         state.training.currentBook.currentLine.wrongMove !== null;
