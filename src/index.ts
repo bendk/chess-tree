@@ -15,6 +15,7 @@ export {
     OpeningBookSummary,
     POSITION_NAGS,
     Position,
+    Priority,
     SplitNode,
     addEndgamePosition,
     calcNodeInfo,
