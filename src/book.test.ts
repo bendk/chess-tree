@@ -1,10 +1,11 @@
 import {
     addEndgamePosition,
-    calcNodeInfo,
     combineNodes,
     findStartOfBranch,
     getDescendant,
     getNodePath,
+    lineCount,
+    lineCountByPriority,
     newEndgameBook,
     newOpeningBook,
     updateAllDescendents,
@@ -12,6 +13,7 @@ import {
     updateChild,
     removeEndgamePosition,
     splitNode,
+    Priority,
 } from "./book";
 import { buildNode } from "./testutil";
 
@@ -89,7 +91,7 @@ describe("utility functions", () => {
         ]);
     });
 
-    test("calcNodeInfo", () => {
+    test("lineCount", () => {
         const node = buildNode({
             e5: {
                 Nf3: {
@@ -101,47 +103,37 @@ describe("utility functions", () => {
             },
             e6: {},
         });
-        expect(calcNodeInfo(node)).toEqual({
-            lineCount: 3,
-            childCount: 2,
-            childLineCount: {
-                e5: 2,
-                e6: 1,
+        expect(lineCount(node)).toEqual(3);
+        expect(lineCount(getDescendant(node, ["e5"])!)).toEqual(2);
+        expect(lineCount(getDescendant(node, ["e5", "Nf3"])!)).toEqual(2);
+        expect(lineCount(getDescendant(node, ["e5", "Nf3", "Nc6"])!)).toEqual(
+            1,
+        );
+        expect(lineCount(getDescendant(node, ["e6"])!)).toEqual(1);
+    });
+
+    test("lineCountByPriority", () => {
+        const node = buildNode({
+            e5: {
+                Nf3: {
+                    Nc6: {
+                        Bc4: {},
+                    },
+                    Nf6: {},
+                    d6: {},
+                    f5: {
+                        priority: Priority.TrainLast,
+                    },
+                },
             },
-            maxDepth: 4,
-        });
-        expect(calcNodeInfo(getDescendant(node, ["e5"])!)).toEqual({
-            lineCount: 2,
-            childCount: 1,
-            childLineCount: {
-                Nf3: 2,
+            e6: {
+                priority: Priority.TrainFirst,
             },
-            maxDepth: 3,
         });
-        expect(calcNodeInfo(getDescendant(node, ["e5", "Nf3"])!)).toEqual({
-            lineCount: 2,
-            childCount: 2,
-            childLineCount: {
-                Nc6: 1,
-                Nf6: 1,
-            },
-            maxDepth: 2,
-        });
-        expect(
-            calcNodeInfo(getDescendant(node, ["e5", "Nf3", "Nc6"])!),
-        ).toEqual({
-            lineCount: 1,
-            childCount: 1,
-            childLineCount: {
-                Bc4: 1,
-            },
-            maxDepth: 1,
-        });
-        expect(calcNodeInfo(getDescendant(node, ["e6"])!)).toEqual({
-            lineCount: 1,
-            childCount: 0,
-            childLineCount: {},
-            maxDepth: 0,
+        expect(lineCountByPriority(node)).toEqual({
+            default: 3,
+            trainFirst: 1,
+            trainLast: 1,
         });
     });
 });

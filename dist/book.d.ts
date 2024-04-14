@@ -119,7 +119,9 @@ export declare enum Nag {
     PlusMinusPosition = 16,
     MinusPlusPosition = 17,
     PlusOverMinusPosition = 18,
-    MinusOverPlusPosition = 19
+    MinusOverPlusPosition = 19,
+    PriorityTrainFirst = 222,
+    PriorityTrainLast = 223
 }
 /**
  * Annotations for a note
@@ -182,10 +184,18 @@ export declare function getDescendant(node: Node, moves: Move[]): Node | null;
  */
 export declare function getNodePath(node: Node, moves: Move[]): Node[] | null;
 /**
- * Calculate information about a node
- *
+ * Get the total number of lines for a node
  */
-export declare function calcNodeInfo(node: Node): NodeInfo;
+export declare function lineCount(node: Node): number;
+/**
+ * Get the total number of lines for a node
+ */
+export declare function lineCountByPriority(node: Node): LineCountByPriority;
+export interface LineCountByPriority {
+    default: number;
+    trainFirst: number;
+    trainLast: number;
+}
 /**
  * Result of a getNodeInfo() call
  *

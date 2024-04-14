@@ -16,7 +16,7 @@ export function viewNodeTree(params: ViewNodeTreeParams): ViewNodeTreeResult {
  * This is like MoveNode with some exceptions:
  *    - Truncated nodes do not have a `children` field.
  *    - View nodes have a `depth` field which indicates the number of moves in their deepest branch
- *    - View nodes have a `lineCount` field, which is the result of `calcNodeInfo(node).lineCount`.
+ *    - View nodes have a `lineCount` field, which is the result of `lineCount(node)`.
  *    - View nodes have a `branchCount` field.  This indicates the total number of branches in the
  *      node tree.  If descendent nodes are truncated then `branchCount < lineCount`.
  */

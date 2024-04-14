@@ -55,8 +55,16 @@ function recordNode(chess, node) {
     if (comments.length > 0) {
         chess.setComment(comments.join(" "));
     }
-    if (node.nags.length > 0) {
-        chess.setNags(node.nags.map((n) => `$${n}`));
+    const nags = [...node.nags];
+    // Use special embedded comments to store priority
+    if (node.priority == book_1.Priority.TrainFirst) {
+        nags.push(book_1.Nag.PriorityTrainFirst);
+    }
+    else if (node.priority == book_1.Priority.TrainLast) {
+        nags.push(book_1.Nag.PriorityTrainLast);
+    }
+    if (nags.length > 0) {
+        chess.setNags(nags.map((n) => `$${n}`));
     }
     const currentMove = chess.currentMove();
     for (const [move, child] of Object.entries(node.children)) {
@@ -137,6 +145,7 @@ function importNode(move, prevMove) {
     var _a, _b, _c;
     const children = {};
     let nags = [];
+    let priority = book_1.Priority.Default;
     let comment = "";
     const annotations = {
         squares: [],
@@ -149,7 +158,7 @@ function importNode(move, prevMove) {
         }
     }
     if (prevMove) {
-        nags = importNags(prevMove);
+        [nags, priority] = importNags(prevMove);
         comment = (_a = prevMove.commentAfter) !== null && _a !== void 0 ? _a : "";
         if (prevMove.commentDiag) {
             annotations.squares = (_b = prevMove.commentDiag.colorFields) !== null && _b !== void 0 ? _b : [];
@@ -161,25 +170,32 @@ function importNode(move, prevMove) {
         comment,
         annotations,
         nags,
-        priority: book_1.Priority.Default,
+        priority,
     };
 }
 function importNags(move) {
+    let priority = book_1.Priority.Default;
     if (move.nags === null) {
-        return [];
+        return [[], priority];
     }
     const nags = [];
     for (const nag of move.nags) {
         if (!nag.startsWith("$")) {
-            return [];
+            continue;
         }
         const parsed = parseInt(nag.slice(1));
-        if (!isNaN(parsed)) {
-            nags.push(parsed);
+        if (isNaN(parsed)) {
+            continue;
+        }
+        else if (parsed == book_1.Nag.PriorityTrainLast) {
+            priority = book_1.Priority.TrainLast;
+        }
+        else if (parsed == book_1.Nag.PriorityTrainFirst) {
+            priority = book_1.Priority.TrainFirst;
         }
         else {
-            return [];
+            nags.push(parsed);
         }
     }
-    return nags;
+    return [nags, priority];
 }

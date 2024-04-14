@@ -1,6 +1,6 @@
 {
     "name": "chess-tree",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "description": "Chess move tree manager, focused on editing/training opening/endgame books",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",

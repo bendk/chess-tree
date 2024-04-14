@@ -355,32 +355,62 @@ export function getNodePath(node: Node, moves: Move[]): Node[] | null {
 }
 
 /**
- * Calculate information about a node
- *
+ * Get the total number of lines for a node
  */
-export function calcNodeInfo(node: Node): NodeInfo {
+export function lineCount(node: Node): number {
     if (childCount(node) == 0) {
-        return {
-            lineCount: 1,
-            childCount: 0,
-            childLineCount: {},
-            maxDepth: 0,
-        };
+        return 1;
     }
-    const info: NodeInfo = {
-        lineCount: 0,
-        childCount: 0,
-        childLineCount: {},
-        maxDepth: 0,
+    let count = 0;
+    for (const [_, child] of Object.entries(node.children)) {
+        count += lineCount(child);
+    }
+    return count;
+}
+
+/**
+ * Get the total number of lines for a node
+ */
+export function lineCountByPriority(node: Node): LineCountByPriority {
+    if (childCount(node) == 0) {
+        if (node.priority === Priority.TrainFirst) {
+            return {
+                default: 0,
+                trainFirst: 1,
+                trainLast: 0,
+            };
+        } else if (node.priority == Priority.TrainLast) {
+            return {
+                default: 0,
+                trainFirst: 0,
+                trainLast: 1,
+            };
+        } else {
+            return {
+                default: 1,
+                trainFirst: 0,
+                trainLast: 0,
+            };
+        }
+    }
+    const result: LineCountByPriority = {
+        default: 0,
+        trainFirst: 0,
+        trainLast: 0,
     };
-    for (const [move, child] of Object.entries(node.children)) {
-        const childInfo = calcNodeInfo(child);
-        info.lineCount += childInfo.lineCount;
-        info.childLineCount[move] = childInfo.lineCount;
-        info.maxDepth = Math.max(info.maxDepth, childInfo.maxDepth + 1);
-        info.childCount += 1;
+    for (const [_, child] of Object.entries(node.children)) {
+        const childResult = lineCountByPriority(child);
+        result.default += childResult.default;
+        result.trainFirst += childResult.trainFirst;
+        result.trainLast += childResult.trainLast;
     }
-    return info;
+    return result;
+}
+
+export interface LineCountByPriority {
+    default: number;
+    trainFirst: number;
+    trainLast: number;
 }
 
 /**

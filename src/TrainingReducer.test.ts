@@ -1,10 +1,12 @@
 import {
+    addEndgamePosition,
     newEndgameBook,
     newOpeningBook,
     Book,
-    addEndgamePosition,
+    Move,
+    Priority,
 } from "./book";
-import { CurrentLineHistoryEntry, newTraining } from "./training";
+import { newTraining, CurrentLineHistoryEntry } from "./training";
 import * as TrainingReducer from "./TrainingReducer";
 import { buildNode } from "./testutil";
 
@@ -771,4 +773,152 @@ test("moves at the wrong time", () => {
     expect(
         TrainingReducer.reduce(state, { type: "try-move", move: "exd4" }),
     ).toBe(state);
+});
+
+const frenchDefense = newOpeningBook("French Defense", "w", [
+    "e4",
+    "e6",
+    "d4",
+    "d5",
+    "Nc3",
+]);
+frenchDefense.rootNode = buildNode({
+    dxe4: {
+        Nxe4: {},
+    },
+    Nf6: {
+        e5: {
+            Nfd7: {
+                priority: Priority.TrainFirst,
+                f4: {
+                    priority: Priority.TrainFirst,
+                },
+            },
+            Ne4: {
+                priority: Priority.TrainLast,
+                Nxe4: {
+                    priority: Priority.TrainLast,
+                },
+            },
+        },
+    },
+    Bb4: {
+        priority: Priority.TrainFirst,
+        e5: {
+            priority: Priority.TrainFirst,
+        },
+    },
+});
+
+function checkMoves(state: TrainingReducer.State, expectedMoves: Move[]) {
+    expect(
+        state.training.currentBook?.currentLine.moves.map((m) => m.move),
+    ).toEqual(expectedMoves);
+}
+
+test("trainingSession ordering by priority", () => {
+    let state = TrainingReducer.initialState(
+        newTraining([frenchDefense], { type: "all" }, false),
+        [frenchDefense],
+    );
+    state = TrainingReducer.reduce(state, {
+        type: "load-book",
+        book: frenchDefense,
+    });
+    // Train the high-priority lines first.  (For the unit tests,
+    // high-priority lines will be ordered by the order of their keys.
+    // In a real session, they will be randomly ordered).
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 0,
+    });
+    checkMoves(state, ["Nf6"]);
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "e5" });
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 2,
+    });
+    checkMoves(state, ["Nf6", "e5", "Nfd7"]);
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "f4" });
+    checkState({
+        state,
+        nextStep: {
+            type: "show-line-summary",
+            moves: ["Nf6", "e5", "Nfd7", "f4"],
+            history: buildHistory("=", "+", "=", "+"),
+        },
+        correct: 2,
+        incorrect: 0,
+        linesTrained: 0,
+        currentLineIndex: 4,
+        history: buildHistory("=", "+", "=", "+"),
+    });
+
+    state = TrainingReducer.reduce(state, { type: "finish-current-line" });
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 0,
+    });
+    checkMoves(state, ["Bb4"]);
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "e5" });
+    checkState({
+        state,
+        nextStep: {
+            type: "show-line-summary",
+            moves: ["Bb4", "e5"],
+            history: buildHistory("=", "+"),
+        },
+        correct: 3,
+        incorrect: 0,
+        linesTrained: 1,
+        currentLineIndex: 2,
+        history: buildHistory("=", "+"),
+    });
+
+    state = TrainingReducer.reduce(state, { type: "finish-current-line" });
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 0,
+    });
+    checkMoves(state, ["dxe4"]);
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "Nxe4" });
+    checkState({
+        state,
+        nextStep: {
+            type: "show-line-summary",
+            moves: ["dxe4", "Nxe4"],
+            history: buildHistory("=", "+"),
+        },
+        correct: 4,
+        incorrect: 0,
+        linesTrained: 2,
+        currentLineIndex: 2,
+        history: buildHistory("=", "+"),
+    });
+
+    state = TrainingReducer.reduce(state, { type: "finish-current-line" });
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 0,
+    });
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "e5" });
+    state = TrainingReducer.reduce(state, {
+        type: "move-board-forward",
+        fromCurrentLineIndex: 2,
+    });
+    checkMoves(state, ["Nf6", "e5", "Ne4"]);
+    state = TrainingReducer.reduce(state, { type: "try-move", move: "Nxe4" });
+    checkState({
+        state,
+        nextStep: {
+            type: "show-line-summary",
+            moves: ["Nf6", "e5", "Ne4", "Nxe4"],
+            history: buildHistory("=", "+", "=", "+"),
+        },
+        correct: 6,
+        incorrect: 0,
+        linesTrained: 3,
+        currentLineIndex: 4,
+        history: buildHistory("=", "+", "=", "+"),
+    });
 });

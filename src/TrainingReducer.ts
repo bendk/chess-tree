@@ -8,9 +8,9 @@ import {
     BookSummary,
     Move,
     Node,
-    calcNodeInfo,
     childCount,
     getDescendant,
+    lineCountByPriority,
     updateChild,
 } from "./book";
 import {
@@ -681,12 +681,7 @@ function extendCurrentLineMoves(state: State): State {
             "TrainingReducer.extendCurrentLineMoves(): no moves to choose",
         );
     }
-    let move: Move;
-    if (state.training.shuffle) {
-        move = pickMoveRandomly(calcNodeInfo(currentNode).childLineCount);
-    } else {
-        move = allMoves[0];
-    }
+    const move = pickNextMove(currentNode, state.training.shuffle);
     const moveNode = { ...currentNode.children[move], move };
 
     return changeCurrentLine(state, (currentLine) => ({
@@ -831,6 +826,49 @@ function getCurrentNode(currentBook: CurrentBook): Node {
 }
 
 /**
+ * Pick the next move of a training line
+ *
+ * Prioritize moves based on the priority of the final move in each line from the node
+ *
+ * Used to pick a random move from a node, where each weight is the number of lines for that move.
+ */
+function pickNextMove(node: Node, shuffle: boolean): Move {
+    const lineCountsTrainFirst: Record<Move, number> = {};
+    const lineCountsDefault: Record<Move, number> = {};
+    const lineCountsTrainLast: Record<Move, number> = {};
+
+    for (const [move, child] of Object.entries(node.children)) {
+        const allCounts = lineCountByPriority(child);
+        if (allCounts.trainFirst > 0) {
+            lineCountsTrainFirst[move] = allCounts.trainFirst;
+        }
+        if (allCounts.default > 0) {
+            lineCountsDefault[move] = allCounts.default;
+        }
+        if (allCounts.trainLast > 0) {
+            lineCountsTrainLast[move] = allCounts.trainLast;
+        }
+    }
+
+    const lineCountsInPriorityOrder = [
+        lineCountsTrainFirst,
+        lineCountsDefault,
+        lineCountsTrainLast,
+    ];
+    for (const lineCounts of lineCountsInPriorityOrder) {
+        if (Object.keys(lineCounts).length > 0) {
+            if (shuffle) {
+                return pickMoveRandomly(lineCounts);
+            } else {
+                return Object.keys(lineCounts)[0];
+            }
+        }
+    }
+
+    throw Error("TrainingReducer.pickNextMove(): all lines counts are 0");
+}
+
+/**
  * Pick a move randomly, but with each move having a different weight
  *
  * Used to pick a random move from a node, where each weight is the number of lines for that move.
@@ -838,7 +876,9 @@ function getCurrentNode(currentBook: CurrentBook): Node {
 function pickMoveRandomly(moveMap: Record<string, number>): string {
     const moves = Object.keys(moveMap);
     if (moves.length == 0) {
-        throw Error("TrainingReducer.pickMove(): no moves to pick from");
+        throw Error(
+            "TrainingReducer.pickMoveRandomly(): no moves to pick from",
+        );
     }
     const totalWeight = Object.values(moveMap).reduce((a, b) => a + b, 0);
     let choice = Math.floor(Math.random() * totalWeight);
