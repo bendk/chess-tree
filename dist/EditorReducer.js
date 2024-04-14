@@ -99,6 +99,16 @@ function reduce(state, action) {
             moves: state.moves,
         };
     }
+    else if (action.type == "set-priority") {
+        return {
+            ...NodeReducer.reduce(state, {
+                type: "set-priority",
+                moves: state.moves,
+                priority: action.priority,
+            }),
+            moves: state.moves,
+        };
+    }
     else if (action.type == "undo") {
         return {
             ...NodeReducer.reduce(state, { type: "undo" }),

@@ -1,4 +1,4 @@
-import { Annotations, Move, Nag, Node } from "./book";
+import { Annotations, Move, Nag, Node, Priority } from "./book";
 import * as NodeReducer from "./NodeReducer";
 /**
  * State for the reducer
@@ -9,7 +9,7 @@ import * as NodeReducer from "./NodeReducer";
 export type State = NodeReducer.State & {
     moves: Move[];
 };
-export type Action = ActionSetMoves | ActionAdd | ActionDeleteBranch | ActionDeleteNode | ActionSetComment | ActionSetAnnotations | ActionSetNags | ActionUndo | ActionRedo | ActionResetUndo;
+export type Action = ActionSetMoves | ActionAdd | ActionDeleteBranch | ActionDeleteNode | ActionSetComment | ActionSetAnnotations | ActionSetNags | ActionSetPriority | ActionUndo | ActionRedo | ActionResetUndo;
 /**
  * Change the current `moves`
  */
@@ -55,6 +55,10 @@ export interface ActionSetAnnotations {
 export interface ActionSetNags {
     type: "set-nags";
     nags: Nag[];
+}
+export interface ActionSetPriority {
+    type: "set-priority";
+    priority: Priority;
 }
 export interface ActionUndo {
     type: "undo";

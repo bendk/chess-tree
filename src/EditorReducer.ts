@@ -10,6 +10,7 @@ import {
     Move,
     Nag,
     Node,
+    Priority,
     childCount,
     getDescendant,
 } from "./book";
@@ -33,6 +34,7 @@ export type Action =
     | ActionSetComment
     | ActionSetAnnotations
     | ActionSetNags
+    | ActionSetPriority
     | ActionUndo
     | ActionRedo
     | ActionResetUndo;
@@ -88,6 +90,11 @@ export interface ActionSetAnnotations {
 export interface ActionSetNags {
     type: "set-nags";
     nags: Nag[];
+}
+
+export interface ActionSetPriority {
+    type: "set-priority";
+    priority: Priority;
 }
 
 export interface ActionUndo {
@@ -183,6 +190,15 @@ export function reduce(state: State, action: Action): State {
                 type: "set-nags",
                 moves: state.moves,
                 nags: action.nags,
+            }),
+            moves: state.moves,
+        };
+    } else if (action.type == "set-priority") {
+        return {
+            ...NodeReducer.reduce(state, {
+                type: "set-priority",
+                moves: state.moves,
+                priority: action.priority,
             }),
             moves: state.moves,
         };
