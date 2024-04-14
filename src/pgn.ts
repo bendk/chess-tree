@@ -64,8 +64,15 @@ function recordNode(chess: Chess, node: Node) {
     if (comments.length > 0) {
         chess.setComment(comments.join(" "));
     }
-    if (node.nags.length > 0) {
-        chess.setNags(node.nags.map((n) => `$${n}`));
+    const nags = [...node.nags];
+    // Use special embedded comments to store priority
+    if (node.priority == Priority.TrainFirst) {
+        nags.push(Nag.PriorityTrainFirst);
+    } else if (node.priority == Priority.TrainLast) {
+        nags.push(Nag.PriorityTrainLast);
+    }
+    if (nags.length > 0) {
+        chess.setNags(nags.map((n) => `$${n}`));
     }
     const currentMove = chess.currentMove();
     for (const [move, child] of Object.entries(node.children)) {
@@ -154,6 +161,7 @@ function splitPgn(pgnText: string): string[] {
 function importNode(move: Move | undefined | null, prevMove?: Move): Node {
     const children = {};
     let nags = [];
+    let priority = Priority.Default;
     let comment = "";
     const annotations: Annotations = {
         squares: [],
@@ -171,7 +179,7 @@ function importNode(move: Move | undefined | null, prevMove?: Move): Node {
     }
 
     if (prevMove) {
-        nags = importNags(prevMove);
+        [nags, priority] = importNags(prevMove);
         comment = prevMove.commentAfter ?? "";
         if (prevMove.commentDiag) {
             annotations.squares = prevMove.commentDiag.colorFields ?? [];
@@ -183,26 +191,31 @@ function importNode(move: Move | undefined | null, prevMove?: Move): Node {
         comment,
         annotations,
         nags,
-        priority: Priority.Default,
+        priority,
     };
 }
 
-function importNags(move: Move): Nag[] {
+function importNags(move: Move): [Nag[], Priority] {
+    let priority = Priority.Default;
     if (move.nags === null) {
-        return [];
+        return [[], priority];
     }
 
     const nags = [];
     for (const nag of move.nags) {
         if (!nag.startsWith("$")) {
-            return [];
+            continue;
         }
         const parsed = parseInt(nag.slice(1));
-        if (!isNaN(parsed)) {
-            nags.push(parsed);
+        if (isNaN(parsed)) {
+            continue;
+        } else if (parsed == Nag.PriorityTrainLast) {
+            priority = Priority.TrainLast;
+        } else if (parsed == Nag.PriorityTrainFirst) {
+            priority = Priority.TrainFirst;
         } else {
-            return [];
+            nags.push(parsed);
         }
     }
-    return nags;
+    return [nags, priority];
 }

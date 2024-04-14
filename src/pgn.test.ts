@@ -4,6 +4,7 @@ import {
     newEndgamePosition,
     Book,
     Nag,
+    Priority,
 } from "./book";
 import { exportBook, importBook } from "./pgn";
 import { buildNode } from "./testutil";
@@ -17,20 +18,24 @@ test("export opening book", () => {
                 nags: [Nag.GoodMove],
                 a6: {
                     arrows: ["Gc2c3", "Rc3d4"],
+                    priority: Priority.Default,
                     Ba4: {},
                 },
                 Nf6: {
                     "O-O": {},
+                    priority: Priority.TrainFirst,
                 },
             },
         },
         Nf6: {
             Nxe5: {
                 squares: ["Rd4", "Gd5"],
+                priority: Priority.TrainLast,
             },
         },
     });
     const exported = exportBook(book);
+    checkBooksSame(importBook(exported), book);
     expect(exported).toEqual(`\
 [SetUp "1"]
 [FEN "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"]
@@ -46,7 +51,7 @@ test("export opening book", () => {
 [bookColor "w"]
 [bookInitialMoves "e4:e5:Nf3"]
 
-1. Nc6 (1. Nf6 Nxe5 { [%csl Rd4,Gd5] }) 1... Bb5 $1 { The Ruy Lopez } 2. a6 { [%cal Gc2c3,Rc3d4] } (2. Nf6 O-O) 2... Ba4 *`);
+1. Nc6 (1. Nf6 Nxe5 $223 { [%csl Rd4,Gd5] }) 1... Bb5 $1 { The Ruy Lopez } 2. a6 { [%cal Gc2c3,Rc3d4] } (2. Nf6 $222 O-O) 2... Ba4 *`);
 
     checkBooksSame(importBook(exported), book);
 });
@@ -73,6 +78,8 @@ test("export endgame book", () => {
     });
     book.positions = [pos1, pos2];
     const exported = exportBook(book);
+    checkBooksSame(importBook(exported), book);
+
     expect(exported).toEqual(`\
 [SetUp "1"]
 [FEN "k7/8/8/8/8/8/8/K7 w - - 0 1"]
@@ -103,8 +110,6 @@ test("export endgame book", () => {
 [positionColor "b"]
 
 1. Kg8 (1. Kg7 Kg2) 1... Kg1 *`);
-
-    checkBooksSame(importBook(exported), book);
 });
 
 function checkBooksSame(actual: Book, expected: Book) {

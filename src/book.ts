@@ -142,6 +142,10 @@ export enum Nag {
     MinusPlusPosition = 17,
     PlusOverMinusPosition = 18,
     MinusOverPlusPosition = 19,
+    // Specialized Nags for chess-tree, according to Wikipedia all values in the range [222-237] are
+    // unused by other software
+    PriorityTrainFirst = 222,
+    PriorityTrainLast = 223,
 }
 
 /**
