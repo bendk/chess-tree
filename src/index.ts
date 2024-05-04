@@ -24,6 +24,7 @@ export {
     getDescendant,
     getNodePath,
     lineCount,
+    moveLine,
     nagText,
     newEndgameBook,
     newEndgamePosition,
