@@ -200,21 +200,24 @@ describe("deleting lines", () => {
 });
 
 describe("priority", () => {
-    const rootNode = buildNode({
-        e4: {
-            e5: {
-                Nf3: {
-                    Nc6: {
-                        Bc4: {
-                            Bc5: {},
+    function rootNodeInitial(): Node {
+        return buildNode({
+            e4: {
+                e5: {
+                    Nf3: {
+                        Nc6: {
+                            Bc4: {
+                                Bc5: {},
+                            },
                         },
                     },
+                    Nc3: {},
                 },
-                Nc3: {},
             },
-        },
-        d4: {},
-    });
+            d4: {},
+        });
+    }
+    const rootNode = rootNodeInitial();
 
     test("set priority after split", () => {
         let state = NodeReducer.initialState(rootNode);
@@ -224,6 +227,7 @@ describe("priority", () => {
             moves: ["e4", "e5", "Nf3", "Nc6", "Bc4"],
             priority: Priority.TrainFirst,
         });
+        expect(rootNode).toEqual(rootNodeInitial());
         expect(state.node).toEqual(
             buildNode({
                 e4: {
@@ -246,6 +250,7 @@ describe("priority", () => {
                 d4: {},
             }),
         );
+        expect(rootNode).toEqual(rootNodeInitial());
     });
 
     test("set priority before split", () => {
@@ -281,6 +286,7 @@ describe("priority", () => {
                 d4: {},
             }),
         );
+        expect(rootNode).toEqual(rootNodeInitial());
     });
 
     test("delete one branch, when the other has a priority set", () => {
@@ -340,6 +346,7 @@ describe("priority", () => {
                 d4: {},
             }),
         );
+        expect(rootNode).toEqual(rootNodeInitial());
     });
 
     test("extend branch with priority", () => {
@@ -379,6 +386,7 @@ describe("priority", () => {
                 d4: {},
             }),
         );
+        expect(rootNode).toEqual(rootNodeInitial());
     });
 });
 

@@ -1,16 +1,15 @@
 import {
     addEndgamePosition,
+    addLine,
     combineNodes,
-    findStartOfBranch,
     getDescendant,
     getNodePath,
     lineCount,
     lineCountByPriority,
     newEndgameBook,
+    newNode,
     newOpeningBook,
-    updateAllDescendents,
-    updateToStartOfBranch,
-    updateChild,
+    moveLine,
     removeEndgamePosition,
     splitNode,
     Priority,
@@ -44,6 +43,159 @@ describe("how the position field gets set", () => {
         expect(book.position).toEqual("4k3/R7/4K3/4P3/8/8/8/4r3 b - - 0 1");
         book = removeEndgamePosition(book, book.positions[0].id);
         expect(book.position).toEqual("8/8/4k3/8/8/4K3/8/8 w - - 0 1");
+    });
+});
+
+test("addLine", () => {
+    const node = newNode();
+    const updated = addLine(node, ["e4", "e5", "Nf3"]);
+    expect(updated).toEqual(
+        buildNode({
+            e4: {
+                e5: {
+                    Nf3: {},
+                },
+            },
+        }),
+    );
+    // Node shouldn't be updated
+    expect(node).toEqual(buildNode({}));
+    const updated2 = addLine(updated, ["e4", "e5", "Nc3"]);
+    expect(updated2).toEqual(
+        buildNode({
+            e4: {
+                e5: {
+                    Nf3: {},
+                    Nc3: {},
+                },
+            },
+        }),
+    );
+});
+
+describe("moveLine", () => {
+    test("simple case", () => {
+        const source = newOpeningBook("e4", "w", ["e4"]);
+        const dest = newOpeningBook("e4", "w", ["e4"]);
+        source.rootNode = buildNode({
+            e5: {
+                Nf3: {
+                    Nc6: {},
+                    Nf6: {},
+                },
+                Nc3: {},
+            },
+        });
+        const [newSource, newDest] = moveLine(source, dest, [
+            "e4",
+            "e5",
+            "Nf3",
+        ]);
+        expect(newSource.rootNode).toEqual(
+            buildNode({
+                e5: {
+                    Nc3: {},
+                },
+            }),
+        );
+        expect(newDest.rootNode).toEqual(
+            buildNode({
+                e5: {
+                    Nf3: {
+                        Nc6: {},
+                        Nf6: {},
+                    },
+                },
+            }),
+        );
+    });
+
+    test("merging moves", () => {
+        const source = newOpeningBook("e4", "w", ["e4"]);
+        const dest = newOpeningBook("e4", "w", ["e4"]);
+        source.rootNode = buildNode({
+            e5: {
+                Nf3: {
+                    Nc6: {},
+                    Nf6: {},
+                },
+                Nc3: {},
+            },
+        });
+        dest.rootNode = buildNode({
+            e5: {
+                Nf3: {
+                    Nc6: {},
+                },
+            },
+        });
+        const [newSource, newDest] = moveLine(source, dest, [
+            "e4",
+            "e5",
+            "Nf3",
+        ]);
+        expect(newSource.rootNode).toEqual(
+            buildNode({
+                e5: {
+                    Nc3: {},
+                },
+            }),
+        );
+        expect(newDest.rootNode).toEqual(
+            buildNode({
+                e5: {
+                    Nf3: {
+                        Nc6: {},
+                        Nf6: {},
+                    },
+                },
+            }),
+        );
+    });
+
+    test("different initial moves", () => {
+        // 2 books with different initial moves, check that we can move lines from one to another
+        let book1 = newOpeningBook("e4", "w", ["e4"]);
+        let book2 = newOpeningBook("e4", "w", ["e4", "e5"]);
+        book1.rootNode = buildNode({
+            e5: {
+                Nf3: {
+                    Nc6: {},
+                    Nf6: {},
+                },
+                Nc3: {},
+            },
+        });
+        [book1, book2] = moveLine(book1, book2, ["e4", "e5", "Nf3"]);
+        expect(book1.rootNode).toEqual(
+            buildNode({
+                e5: {
+                    Nc3: {},
+                },
+            }),
+        );
+        expect(book2.rootNode).toEqual(
+            buildNode({
+                Nf3: {
+                    Nc6: {},
+                    Nf6: {},
+                },
+            }),
+        );
+        // Move the lines the other direction
+        [book2, book1] = moveLine(book2, book1, ["e4", "e5", "Nf3"]);
+        expect(book1.rootNode).toEqual(
+            buildNode({
+                e5: {
+                    Nf3: {
+                        Nc6: {},
+                        Nf6: {},
+                    },
+                    Nc3: {},
+                },
+            }),
+        );
+        expect(book2.rootNode).toEqual(buildNode({}));
     });
 });
 
@@ -175,101 +327,4 @@ test("splitting and combining nodes", () => {
         "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1": [],
     });
     expect(combineNodes(splitNodes, "<root>")).toEqual(node);
-});
-
-describe("utility functions", () => {
-    const node = buildNode({
-        e4: {
-            e5: {
-                Nf3: {
-                    Nc6: {
-                        Bc4: {},
-                    },
-                },
-            },
-        },
-        d4: {},
-    });
-    test("findStartOfBranch", () => {
-        expect(findStartOfBranch(node, [])).toEqual([]);
-        expect(findStartOfBranch(node, ["e4"])).toEqual(["e4"]);
-        expect(findStartOfBranch(node, ["e4", "e5"])).toEqual(["e4"]);
-        expect(findStartOfBranch(node, ["e4", "e5", "Nf3"])).toEqual(["e4"]);
-        expect(findStartOfBranch(node, ["e4", "e5", "Nf3", "Nc6"])).toEqual([
-            "e4",
-        ]);
-    });
-    test("updateChild", () => {
-        expect(
-            updateChild(node, ["e4", "e5"], (node) => ({
-                ...node,
-                comment: "foo",
-            })),
-        ).toEqual(
-            buildNode({
-                e4: {
-                    e5: {
-                        comment: "foo",
-                        Nf3: {
-                            Nc6: {
-                                Bc4: {},
-                            },
-                        },
-                    },
-                },
-                d4: {},
-            }),
-        );
-    });
-    test("updateAllDescendents", () => {
-        expect(
-            updateAllDescendents(node, ["e4", "e5"], (node) => ({
-                ...node,
-                comment: "foo",
-            })),
-        ).toEqual(
-            buildNode({
-                e4: {
-                    e5: {
-                        comment: "foo",
-                        Nf3: {
-                            comment: "foo",
-                            Nc6: {
-                                comment: "foo",
-                                Bc4: {
-                                    comment: "foo",
-                                },
-                            },
-                        },
-                    },
-                },
-                d4: {},
-            }),
-        );
-    });
-    test("updateToStartOfBranch", () => {
-        expect(
-            updateToStartOfBranch(node, ["e4", "e5", "Nf3", "Nc6"], (node) => ({
-                ...node,
-                comment: "foo",
-            })),
-        ).toEqual(
-            buildNode({
-                e4: {
-                    comment: "foo",
-                    e5: {
-                        comment: "foo",
-                        Nf3: {
-                            comment: "foo",
-                            Nc6: {
-                                comment: "foo",
-                                Bc4: {},
-                            },
-                        },
-                    },
-                },
-                d4: {},
-            }),
-        );
-    });
 });

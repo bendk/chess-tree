@@ -173,6 +173,10 @@ export declare function newNode(): Node;
  */
 export declare function childCount(node: Node): number;
 /**
+ * If there is exactly 1 child node, return it
+ */
+export declare function getSingleChild(node: Node): Node | null;
+/**
  * Get a decendent node
  */
 export declare function getDescendant(node: Node, moves: Move[]): Node | null;
@@ -211,29 +215,72 @@ export interface NodeInfo {
     maxDepth: number;
 }
 /**
- * Create a new node by updating one of the child nodes
- *
- * This is useful for reducers since it doesn't mutate any of the existing nodes.
+ * Add a new line to a node
  */
-export declare function updateChild(node: Node, moves: Move[], operation: (node: Node) => Node): Node;
+export declare function addLine(node: Node, moves: Move[]): Node;
 /**
- * Create a new node by updating all decendents of a node
- *
- * This is useful for reducers since it doesn't mutate any of the existing nodes.
+ * Move a line from one opening book to another
  */
-export declare function updateAllDescendents(node: Node, moves: Move[], operation: (node: Node) => Node): Node;
+export declare function moveLine(source: OpeningBook, destination: OpeningBook, moves: Move[]): [OpeningBook, OpeningBook];
 /**
- * Create a new node by updating all ancestors, until the first ancestor with multiple children
+ * Cursor supports moving through a Node and performing COW updates.
  *
- * This is useful for reducers since it doesn't mutate any of the existing nodes.
+ * This is a convient and efficient way to generate an updated node without mutating the original.
  */
-export declare function updateToStartOfBranch(node: Node, moves: Move[], operation: (node: Node) => Node): Node;
-/**
- * Find the start of the last branch before a series of moves
- *
- * This is the last move that was the only one child.
- */
-export declare function findStartOfBranch(node: Node, moves: Move[]): Move[];
+export declare class NodeCursor {
+    /**
+     * Node we're currently operating on.  This is a copy of the node from the source node and
+     * can be mutated without mutating the source.
+     */
+    current: Node;
+    parent: NodeCursor | null;
+    /**
+     * "Private" constructor, consumers should use init to create a NodeCursor
+     */
+    constructor(node: Node, parent: NodeCursor | null);
+    /**
+     * Get a new NodeCursor and the node that it will be updating
+     */
+    static init(source: Node): [NodeCursor, Node];
+    private static cloneNode;
+    /**
+     * Move to a child node, updating the cursor
+     *
+     * Returns true on success, false if the move doesn't exist in the current node
+     */
+    move(move: Move): boolean;
+    /**
+     * Move to a child node, creating a new one if the move doesn't currently exist
+     *
+     * Returns true if it inserted a move
+     */
+    moveOrInsert(move: Move): boolean;
+    /**
+     * Get a list of cursors for all child nodes
+     */
+    childCursors(): NodeCursor[];
+    /**
+     * Move to the parent node
+     */
+    parentNode(): Node | undefined;
+    /**
+     * Move to the parent node
+     */
+    moveToParent(): boolean;
+    private moveToChild;
+    /**
+     * Try to remove a child node
+     */
+    removeChild(move: Move): Node | null;
+    /**
+     * Move to a descendant node, updating the cursor
+     *
+     * This tries to make all moves in moves.  On failure, it will return false and the cursor will
+     * be on the last node that existed.
+     */
+    bulkMove(moves: Move[]): boolean;
+    clone(): NodeCursor;
+}
 /**
  * Node where children are not nested inline
  *

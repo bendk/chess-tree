@@ -11,6 +11,7 @@ export {
     MoveNode,
     Nag,
     Node,
+    NodeCursor,
     OpeningBook,
     OpeningBookSummary,
     POSITION_NAGS,

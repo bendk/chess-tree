@@ -8,10 +8,10 @@ import {
     BookSummary,
     Move,
     Node,
+    NodeCursor,
     childCount,
     getDescendant,
     lineCountByPriority,
-    updateChild,
 } from "./book";
 import {
     CurrentBook,
@@ -312,7 +312,7 @@ function handleMoveBoardForward(state: State, action: MoveBoardForward): State {
 
     const currentBook = state.training.currentBook;
     if (currentBook === null) {
-        throw Error(`TraningSession.reduce: Unknown action type: ${action}`);
+        throw Error("TraningSession.handleMoveBoardForward: no current book");
     }
     const movingPastCurrentMoves =
         state.board.currentLineIndex >= currentBook.currentLine.moves.length;
@@ -701,31 +701,27 @@ function checkUserMove(state: State, userMove: Move): [State, boolean] {
     if (currentBook === null) {
         throw Error("TrainingReducer.checkUserMove(): no current book");
     }
-    // Use `updateChild` to try to find the child node that matches the user move.
-    // If we find that, then remove all other moves for the node.
-    let childNode: Node;
-    const rootNode = updateChild(
+
+    // Try to find the child node that matches the user move.
+    const [cursor, newRootNode] = NodeCursor.init(
         currentBook.currentPosition.rootNode,
-        currentBook.currentLine.moves.map((m) => m.move),
-        (node) => {
-            childNode = node.children[userMove];
-            if (childNode !== undefined) {
-                return {
-                    ...node,
-                    children: {
-                        [userMove]: childNode,
-                    },
-                };
-            } else {
-                return node;
-            }
-        },
     );
-    // If we found the child node, then append it to the current moves
-    let moves = currentBook.currentLine.moves;
-    if (childNode) {
-        moves = [...moves, { ...childNode, move: userMove }];
+    if (!cursor.bulkMove(currentBook.currentLine.moves.map((m) => m.move))) {
+        return [state, false];
     }
+    const childNode = cursor.current.children[userMove];
+    if (childNode === undefined) {
+        return [state, false];
+    }
+    // Success!
+    //
+    // Remove any other moves for the user from that node if they exist
+    cursor.current.children = { [userMove]: childNode };
+    // Append it to the current moves
+    const moves = [
+        ...currentBook.currentLine.moves,
+        { ...childNode, move: userMove },
+    ];
     state = {
         ...state,
         training: {
@@ -738,12 +734,12 @@ function checkUserMove(state: State, userMove: Move): [State, boolean] {
                 },
                 currentPosition: {
                     ...currentBook.currentPosition,
-                    rootNode,
+                    rootNode: newRootNode,
                 },
             },
         },
     };
-    return [state, childNode !== undefined];
+    return [state, true];
 }
 
 /**
@@ -756,47 +752,32 @@ function removeCurrentLineFromNode(state: State): State {
             "TrainingReducer.removeCurrentLineFromNode(): no current book",
         );
     }
-    let node = currentBook.currentPosition.rootNode;
-    let lastBranchIndex = -1;
-    currentBook.currentLine.moves.forEach((move, index) => {
-        if (childCount(node) > 1) {
-            lastBranchIndex = index;
-        }
-        node = node.children[move.move];
-        if (node === undefined) {
-            const moves = currentBook.currentLine.moves
-                .map((m) => m.move)
-                .join(", ");
-            throw Error(
-                `TrainingReducer.removeCurrentLineFromNode(): current moves are illegal (${moves})`,
-            );
-        }
-    });
-
-    let rootNode: Node;
-    if (lastBranchIndex == -1) {
-        // No branches found, meaning this was the last branch
-        rootNode = {
-            ...currentBook.currentPosition.rootNode,
-            children: {},
-        };
-    } else {
-        const moveAfterBranch =
-            currentBook.currentLine.moves[lastBranchIndex].move;
-        rootNode = updateChild(
-            currentBook.currentPosition.rootNode,
-            currentBook.currentLine.moves
-                .slice(0, lastBranchIndex)
-                .map((m) => m.move),
-            (node) => ({
-                ...node,
-                children: Object.fromEntries(
-                    Object.entries(node.children).filter(
-                        ([move, _node]) => move != moveAfterBranch,
-                    ),
-                ),
-            }),
+    const [cursor, newRootNode] = NodeCursor.init(
+        currentBook.currentPosition.rootNode,
+    );
+    const moves = currentBook.currentLine.moves.map((m) => m.move);
+    if (!cursor.bulkMove(moves)) {
+        throw Error(
+            `TrainingReducer.removeCurrentLineFromNode(): current moves are illegal (${moves})`,
         );
+    }
+    // Move backwards, find the last branch and delete that
+    moves.reverse();
+    let foundBranch = false;
+    for (const move of moves) {
+        if (cursor.parent === undefined) {
+            break;
+        }
+        cursor.moveToParent();
+        if (childCount(cursor.current) > 1) {
+            foundBranch = true;
+            delete cursor.current.children[move];
+            break;
+        }
+    }
+    if (!foundBranch) {
+        // This was the last branch in the node, delete all children
+        delete newRootNode.children[moves.at(-1)];
     }
     return {
         ...state,
@@ -806,7 +787,7 @@ function removeCurrentLineFromNode(state: State): State {
                 ...currentBook,
                 currentPosition: {
                     ...currentBook.currentPosition,
-                    rootNode,
+                    rootNode: newRootNode,
                 },
             },
         },

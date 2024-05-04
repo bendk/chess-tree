@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.importBook = exports.exportBook = exports.TrainingReducer = exports.EditorReducer = exports.NodeReducer = exports.newTraining = exports.restartTraining = exports.booksForTraining = exports.viewNodeTree = exports.splitNode = exports.removeEndgamePosition = exports.newOpeningBook = exports.newEndgamePosition = exports.newEndgameBook = exports.nagText = exports.lineCount = exports.getNodePath = exports.getDescendant = exports.combineNodes = exports.childCount = exports.addEndgamePosition = exports.Priority = exports.POSITION_NAGS = exports.Nag = exports.MOVE_NAGS = void 0;
+exports.importBook = exports.exportBook = exports.TrainingReducer = exports.EditorReducer = exports.NodeReducer = exports.newTraining = exports.restartTraining = exports.booksForTraining = exports.viewNodeTree = exports.splitNode = exports.removeEndgamePosition = exports.newOpeningBook = exports.newEndgamePosition = exports.newEndgameBook = exports.nagText = exports.lineCount = exports.getNodePath = exports.getDescendant = exports.combineNodes = exports.childCount = exports.addEndgamePosition = exports.Priority = exports.POSITION_NAGS = exports.NodeCursor = exports.Nag = exports.MOVE_NAGS = void 0;
 var book_1 = require("./book");
 Object.defineProperty(exports, "MOVE_NAGS", { enumerable: true, get: function () { return book_1.MOVE_NAGS; } });
 Object.defineProperty(exports, "Nag", { enumerable: true, get: function () { return book_1.Nag; } });
+Object.defineProperty(exports, "NodeCursor", { enumerable: true, get: function () { return book_1.NodeCursor; } });
 Object.defineProperty(exports, "POSITION_NAGS", { enumerable: true, get: function () { return book_1.POSITION_NAGS; } });
 Object.defineProperty(exports, "Priority", { enumerable: true, get: function () { return book_1.Priority; } });
 Object.defineProperty(exports, "addEndgamePosition", { enumerable: true, get: function () { return book_1.addEndgamePosition; } });

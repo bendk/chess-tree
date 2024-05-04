@@ -18,69 +18,7 @@ function initialState(node) {
 }
 exports.initialState = initialState;
 function reduce(state, action) {
-    let newNode = state.node;
-    let changed = false;
-    if (action.type == "add") {
-        [newNode, changed] = handleAdd(state.node, action.moves, 0);
-    }
-    else if (action.type == "delete") {
-        // If deleting a line caused the parent to become a single-child node, and all grandchildren
-        // have the same priority, then that priority should flood upwards to the previous branch
-        let priorityToFlood = null;
-        const movesToParent = action.moves.slice(0, -1);
-        const lastMove = action.moves.at(-1);
-        if (lastMove !== undefined) {
-            newNode = (0, book_1.updateChild)(state.node, movesToParent, (node) => {
-                const childNode = node.children[lastMove];
-                if (childNode === undefined) {
-                    return node;
-                }
-                changed = true;
-                const newChildEntries = Object.entries(node.children).filter((entry) => entry[0] != lastMove);
-                if (newChildEntries.length == 1 &&
-                    newChildEntries[0][1].priority != node.priority) {
-                    priorityToFlood = newChildEntries[0][1].priority;
-                }
-                return {
-                    ...node,
-                    children: Object.fromEntries(newChildEntries),
-                };
-            });
-            if (priorityToFlood !== null) {
-                newNode = (0, book_1.updateToStartOfBranch)(newNode, movesToParent, (node) => ({ ...node, priority: priorityToFlood }));
-            }
-        }
-        else if ((0, book_1.childCount)(state.node) > 0) {
-            newNode = { ...state.node, children: {} };
-            changed = true;
-        }
-    }
-    else if (action.type == "set-comment") {
-        newNode = (0, book_1.updateChild)(state.node, action.moves, (node) => {
-            changed = changed || node.comment != action.comment;
-            return { ...node, comment: action.comment };
-        });
-    }
-    else if (action.type == "set-annotations") {
-        newNode = (0, book_1.updateChild)(state.node, action.moves, (node) => {
-            changed = changed || node.annotations != action.annotations;
-            return { ...node, annotations: action.annotations };
-        });
-    }
-    else if (action.type == "set-nags") {
-        newNode = (0, book_1.updateChild)(state.node, action.moves, (node) => {
-            changed = changed || node.nags != action.nags;
-            return { ...node, nags: action.nags };
-        });
-    }
-    else if (action.type == "set-priority") {
-        const moves = (0, book_1.findStartOfBranch)(state.node, action.moves);
-        newNode = (0, book_1.updateAllDescendents)(state.node, moves, (node) => {
-            changed = changed || node.priority != action.priority;
-            return { ...node, priority: action.priority };
-        });
-    }
-    else if (action.type == "undo") {
+    if (action.type == "undo") {
         const [node, ...rest] = state.undoStack;
         if (node) {
             return {
@@ -104,45 +42,120 @@ function reduce(state, action) {
             };
         }
     }
-    if (changed) {
-        return {
-            node: newNode,
-            canUndo: true,
-            canRedo: false,
-            undoStack: [state.node, ...state.undoStack],
-            redoStack: [],
-        };
-    }
     else {
-        return state;
+        const newNode = calcNewNode(state.node, action);
+        if (newNode === null) {
+            return state;
+        }
+        else {
+            return {
+                node: newNode,
+                canUndo: true,
+                canRedo: false,
+                undoStack: [state.node, ...state.undoStack],
+                redoStack: [],
+            };
+        }
     }
 }
 exports.reduce = reduce;
-// add is the only action that doesn't use `updateChild`, it can updates multiple
-// children at once when it's adding multiple new moves.
-function handleAdd(node, moves, moveIndex) {
-    const move = moves[moveIndex];
-    let addedChild = false;
-    if (move === undefined) {
-        return [node, false];
+function calcNewNode(rootNode, action) {
+    const [cursor, updatedNode] = book_1.NodeCursor.init(rootNode);
+    if (action.type == "add") {
+        let changed = false;
+        for (const move of action.moves) {
+            if (cursor.moveOrInsert(move)) {
+                changed = true;
+            }
+        }
+        return changed ? updatedNode : null;
+    }
+    else if (action.type == "delete") {
+        const movesToParent = action.moves.slice(0, -1);
+        const lastMove = action.moves.at(-1);
+        if (lastMove === undefined) {
+            // action.moves was the empty list, try to delete all children
+            if ((0, book_1.childCount)(rootNode) > 0) {
+                return { ...rootNode, children: {} };
+            }
+            else {
+                return null;
+            }
+        }
+        if (!cursor.bulkMove(movesToParent)) {
+            return null;
+        }
+        const childNode = cursor.removeChild(lastMove);
+        if (childNode === null) {
+            return null;
+        }
+        // If deleting a line caused the parent to become a single-child node, and all grandchildren
+        // have the same priority, then that priority should flood upwards to the previous branch.
+        const singleChild = (0, book_1.getSingleChild)(cursor.current);
+        if (singleChild && singleChild.priority != cursor.current.priority) {
+            cursor.current.priority = singleChild.priority;
+            while (cursor.parent && (0, book_1.childCount)(cursor.parent.current) == 1) {
+                cursor.moveToParent();
+                cursor.current.priority = singleChild.priority;
+            }
+        }
+        return updatedNode;
+    }
+    else if (action.type == "set-comment") {
+        if (!cursor.bulkMove(action.moves)) {
+            return null;
+        }
+        cursor.current.comment = action.comment;
+        return updatedNode;
+    }
+    else if (action.type == "set-annotations") {
+        if (!cursor.bulkMove(action.moves)) {
+            return null;
+        }
+        cursor.current.annotations = action.annotations;
+        return updatedNode;
+    }
+    else if (action.type == "set-nags") {
+        if (!cursor.bulkMove(action.moves)) {
+            return null;
+        }
+        cursor.current.nags = action.nags;
+        return updatedNode;
+    }
+    else if (action.type == "set-priority") {
+        if (!cursor.bulkMove(action.moves)) {
+            return null;
+        }
+        setNodePriority(cursor, action.priority);
+        updateAncestorPriority(cursor);
+        return updatedNode;
     }
     else {
-        let childNode = node.children[move];
-        if (childNode === undefined) {
-            addedChild = true;
-            childNode = {
-                ...(0, book_1.newNode)(),
-                priority: node.priority,
-            };
+        return null;
+    }
+}
+/**
+ * Set ancestor node's priority to equal the current node, until the first branch node
+ */
+function updateAncestorPriority(cursor) {
+    const priorityToSet = cursor.current.priority;
+    while (true) {
+        const parentNode = cursor.parentNode();
+        if (parentNode === null ||
+            parentNode.priority == priorityToSet ||
+            (0, book_1.childCount)(parentNode) != 1) {
+            break;
         }
-        const [newChild, childChanged] = handleAdd(childNode, moves, moveIndex + 1);
-        const updatedNode = {
-            ...node,
-            children: {
-                ...node.children,
-                [move]: newChild,
-            },
-        };
-        return [updatedNode, addedChild || childChanged];
+        parentNode.priority = priorityToSet;
+        cursor.moveToParent();
+    }
+}
+/**
+ * Set the priority for a node and all its descendents
+ */
+function setNodePriority(cursor, priorityToSet) {
+    cursor.current.priority = priorityToSet;
+    for (const childCursor of cursor.childCursors()) {
+        setNodePriority(childCursor, priorityToSet);
     }
 }

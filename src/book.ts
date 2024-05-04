@@ -324,6 +324,14 @@ export function childCount(node: Node): number {
 }
 
 /**
+ * If there is exactly 1 child node, return it
+ */
+export function getSingleChild(node: Node): Node | null {
+    const children = Object.values(node.children);
+    return children.length == 1 ? children[0] : null;
+}
+
+/**
  * Get a decendent node
  */
 export function getDescendant(node: Node, moves: Move[]): Node | null {
@@ -352,6 +360,19 @@ export function getNodePath(node: Node, moves: Move[]): Node[] | null {
         path.push(node);
     }
     return path;
+}
+
+/**
+ * Convert a list of opening moves to be relative to the initialMoves of an opening
+ */
+function movesRelativeToOpeningBook(
+    source: OpeningBook,
+    moves: Move[],
+): Move[] | null {
+    if (!movesStartWith(moves, source.initialMoves)) {
+        return null;
+    }
+    return moves.slice(source.initialMoves.length);
 }
 
 /**
@@ -429,107 +450,218 @@ export interface NodeInfo {
 }
 
 /**
- * Create a new node by updating one of the child nodes
- *
- * This is useful for reducers since it doesn't mutate any of the existing nodes.
+ * Add a new line to a node
  */
-export function updateChild(
-    node: Node,
+export function addLine(node: Node, moves: Move[]): Node {
+    const [cursor, clonedNode] = NodeCursor.init(node);
+    for (const move of moves) {
+        cursor.moveOrInsert(move);
+    }
+    return clonedNode;
+}
+
+/**
+ * Move a line from one opening book to another
+ */
+export function moveLine(
+    source: OpeningBook,
+    destination: OpeningBook,
     moves: Move[],
-    operation: (node: Node) => Node,
-): Node {
-    const [move, ...rest] = moves;
-    if (move === undefined) {
-        return operation(node);
-    } else {
-        const childNode = node.children[move];
-        if (childNode === undefined) {
-            return node;
+): [OpeningBook, OpeningBook] {
+    // Create 2 cursors: one for the source book and one for the destination book
+    const [sourceCursor, sourceNewRoot] = NodeCursor.init(source.rootNode);
+    const [destCursor, destNewRoot] = NodeCursor.init(destination.rootNode);
+    // Position both cursors at the start of the line
+    const sourceMoves = movesRelativeToOpeningBook(source, moves);
+    if (sourceMoves === null) {
+        throw Error(`${source.name} initial moves do not start with: ${moves}`);
+    }
+    const destMoves = movesRelativeToOpeningBook(destination, moves);
+    if (destMoves === null) {
+        throw Error(
+            `${destination.name} initial moves do not start with: ${moves}`,
+        );
+    }
+    if (!sourceCursor.bulkMove(sourceMoves)) {
+        throw Error(`Line not present in ${source.name}: ${moves}`);
+    }
+    for (const move of destMoves) {
+        destCursor.moveOrInsert(move);
+    }
+    // Move all nodes from source to destination
+    moveAll(sourceCursor, destCursor);
+    // Delete the parent move from source (if there is one)
+    const lastSourceMove = sourceMoves.at(-1);
+    if (lastSourceMove) {
+        sourceCursor.moveToParent();
+        delete sourceCursor.current.children[lastSourceMove];
+    }
+    return [
+        { ...source, rootNode: sourceNewRoot },
+        { ...destination, rootNode: destNewRoot },
+    ];
+}
+
+function moveAll(source: NodeCursor, dest: NodeCursor) {
+    for (const move in source.current.children) {
+        const sourceClone = source.clone();
+        const destClone = dest.clone();
+        sourceClone.move(move);
+        destClone.moveOrInsert(move);
+        moveAll(sourceClone, destClone);
+    }
+    source.current.children = {};
+}
+
+function movesStartWith(moves: Move[], startWith: Move[]): boolean {
+    if (startWith.length > moves.length) {
+        return false;
+    }
+    for (let i = 0; i < startWith.length; i++) {
+        if (moves[i] !== startWith[i]) {
+            return false;
         }
+    }
+    return true;
+}
+
+/**
+ * Cursor supports moving through a Node and performing COW updates.
+ *
+ * This is a convient and efficient way to generate an updated node without mutating the original.
+ */
+export class NodeCursor {
+    /**
+     * Node we're currently operating on.  This is a copy of the node from the source node and
+     * can be mutated without mutating the source.
+     */
+    current: Node;
+    parent: NodeCursor | null;
+
+    /**
+     * "Private" constructor, consumers should use init to create a NodeCursor
+     */
+    constructor(node: Node, parent: NodeCursor | null) {
+        this.current = node;
+        this.parent = parent;
+    }
+
+    /**
+     * Get a new NodeCursor and the node that it will be updating
+     */
+    static init(source: Node): [NodeCursor, Node] {
+        // Create a copy of source for the cursor.
+        const copy = this.cloneNode(source);
+        return [new NodeCursor(copy, null), copy];
+    }
+
+    private static cloneNode(node: Node): Node {
         return {
             ...node,
-            children: {
-                ...node.children,
-                [move]: updateChild(childNode, rest, operation),
-            },
+            children: { ...node.children },
+            annotations: { ...node.annotations },
+            nags: [...node.nags],
         };
     }
-}
 
-/**
- * Create a new node by updating all decendents of a node
- *
- * This is useful for reducers since it doesn't mutate any of the existing nodes.
- */
-export function updateAllDescendents(
-    node: Node,
-    moves: Move[],
-    operation: (node: Node) => Node,
-): Node {
-    const [move, ...rest] = moves;
-    if (move === undefined) {
-        return {
-            ...operation(node),
-            children: Object.fromEntries(
-                Object.entries(node.children).map(([move, childNode]) => [
-                    move,
-                    updateAllDescendents(childNode, [], operation),
-                ]),
-            ),
-        };
-    } else {
-        const childNode = node.children[move];
-        if (childNode === undefined) {
-            return node;
+    /**
+     * Move to a child node, updating the cursor
+     *
+     * Returns true on success, false if the move doesn't exist in the current node
+     */
+    move(move: Move): boolean {
+        const child = this.current.children[move];
+        if (child === undefined) {
+            return false;
         }
-        return {
-            ...node,
-            children: {
-                ...node.children,
-                [move]: updateAllDescendents(childNode, rest, operation),
-            },
-        };
+        this.moveToChild(move, NodeCursor.cloneNode(child));
+        return true;
     }
-}
 
-/**
- * Create a new node by updating all ancestors, until the first ancestor with multiple children
- *
- * This is useful for reducers since it doesn't mutate any of the existing nodes.
- */
-export function updateToStartOfBranch(
-    node: Node,
-    moves: Move[],
-    operation: (node: Node) => Node,
-): Node {
-    const movesToStart = findStartOfBranch(node, moves);
-    for (let i = movesToStart.length; i < moves.length + 1; i++) {
-        node = updateChild(node, moves.slice(0, i), operation);
+    /**
+     * Move to a child node, creating a new one if the move doesn't currently exist
+     *
+     * Returns true if it inserted a move
+     */
+    moveOrInsert(move: Move): boolean {
+        const child = this.current.children[move];
+        if (child === undefined) {
+            this.moveToChild(move, {
+                ...newNode(),
+                priority: this.current.priority,
+            });
+            return true;
+        } else {
+            this.moveToChild(move, NodeCursor.cloneNode(child));
+            return false;
+        }
     }
-    return node;
-}
 
-/**
- * Find the start of the last branch before a series of moves
- *
- * This is the last move that was the only one child.
- */
-export function findStartOfBranch(node: Node, moves: Move[]): Move[] {
-    let lastNodeHadOneChild = false;
-    let lastBranchIndex = 0;
-    for (let i = 0; i < moves.length; i++) {
-        const move = moves[i];
-        node = node.children[move];
-        if (node === undefined) {
-            break;
+    /**
+     * Get a list of cursors for all child nodes
+     */
+    childCursors(): NodeCursor[] {
+        const children = [];
+        for (const move in this.current.children) {
+            const cloned = this.clone();
+            cloned.move(move);
+            children.push(cloned);
         }
-        if (!lastNodeHadOneChild && childCount(node) == 1) {
-            // Add 1 to avoid an off-by-one-error when we call slice
-            lastBranchIndex = i + 1;
-        }
-        lastNodeHadOneChild = childCount(node) == 1;
+        return children;
     }
-    return moves.slice(0, lastBranchIndex);
+
+    /**
+     * Move to the parent node
+     */
+    parentNode(): Node | undefined {
+        return this.parent?.current;
+    }
+
+    /**
+     * Move to the parent node
+     */
+    moveToParent(): boolean {
+        if (this.parent === null) {
+            return false;
+        }
+        this.current = this.parent.current;
+        this.parent = this.parent.parent;
+        return true;
+    }
+
+    private moveToChild(move: Move, child: Node) {
+        this.current.children[move] = child;
+        this.parent = { ...this };
+        this.current = child;
+    }
+
+    /**
+     * Try to remove a child node
+     */
+    removeChild(move: Move): Node | null {
+        const child = this.current.children[move] ?? null;
+        delete this.current.children[move];
+        return child;
+    }
+
+    /**
+     * Move to a descendant node, updating the cursor
+     *
+     * This tries to make all moves in moves.  On failure, it will return false and the cursor will
+     * be on the last node that existed.
+     */
+    bulkMove(moves: Move[]): boolean {
+        for (const move of moves) {
+            if (!this.move(move)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    clone(): NodeCursor {
+        return new NodeCursor(this.current, this.parent);
+    }
 }
 
 /**
