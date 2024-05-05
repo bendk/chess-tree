@@ -108,6 +108,8 @@ describe("moveLine", () => {
                 },
             }),
         );
+        expect(newSource.lineCount).toEqual(1)
+        expect(newDest.lineCount).toEqual(2)
     });
 
     test("merging moves", () => {

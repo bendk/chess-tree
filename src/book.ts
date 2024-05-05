@@ -497,8 +497,8 @@ export function moveLine(
         delete sourceCursor.current.children[lastSourceMove];
     }
     return [
-        { ...source, rootNode: sourceNewRoot },
-        { ...destination, rootNode: destNewRoot },
+        { ...source, rootNode: sourceNewRoot, lineCount: lineCount(sourceNewRoot) },
+        { ...destination, rootNode: destNewRoot, lineCount: lineCount(destNewRoot) },
     ];
 }
 
