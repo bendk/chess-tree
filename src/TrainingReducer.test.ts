@@ -1,6 +1,7 @@
 import {
     addEndgamePosition,
     newEndgameBook,
+    newEndgamePosition,
     newOpeningBook,
     Book,
     Move,
@@ -61,7 +62,10 @@ ruyLopez.rootNode = buildNode({
 
 let endgame = newEndgameBook("ToyEndgame");
 // Toy endgame where the kings start on a1 and a8
-endgame = addEndgamePosition(endgame, "b", "k7/8/8/8/8/8/8/K7 w - - 0 1");
+endgame = addEndgamePosition(
+    endgame,
+    newEndgamePosition("k7/8/8/8/8/8/8/K7 w - - 0 1", "b"),
+);
 endgame.positions[0].rootNode = buildNode({
     Kb1: {
         Kb8: {},
@@ -71,7 +75,10 @@ endgame.positions[0].rootNode = buildNode({
     },
 });
 // Another endgame where the kings start on h1 and h8
-endgame = addEndgamePosition(endgame, "w", "7k/8/8/8/8/8/8/7K b - - 0 1");
+endgame = addEndgamePosition(
+    endgame,
+    newEndgamePosition("7k/8/8/8/8/8/8/7K b - - 0 1", "w"),
+);
 endgame.positions[1].rootNode = buildNode({
     Kg8: {
         Kg1: {},

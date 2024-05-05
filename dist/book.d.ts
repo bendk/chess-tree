@@ -166,7 +166,7 @@ export declare function newEndgamePosition(position: string, color: "w" | "b"): 
 /**
  * Add a position to an endgame book
  */
-export declare function addEndgamePosition(book: EndgameBook, color: Color, position: Position): EndgameBook;
+export declare function addEndgamePosition(book: EndgameBook, position: EndgamePosition): EndgameBook;
 /**
  * Update a position from an endgame book
  */

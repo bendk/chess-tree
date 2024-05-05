@@ -10,6 +10,7 @@ import {
     newNode,
     newOpeningBook,
     moveLine,
+    newEndgamePosition,
     removeEndgamePosition,
     splitNode,
     updateOpening,
@@ -31,14 +32,12 @@ describe("how the position field gets set", () => {
         expect(book.position).toEqual("8/8/4k3/8/8/4K3/8/8 w - - 0 1");
         book = addEndgamePosition(
             book,
-            "b",
-            "4k3/7R/8/4PK2/8/8/8/r7 b - - 0 1",
+            newEndgamePosition("4k3/7R/8/4PK2/8/8/8/r7 b - - 0 1", "b"),
         );
         expect(book.position).toEqual("4k3/7R/8/4PK2/8/8/8/r7 b - - 0 1");
         book = addEndgamePosition(
             book,
-            "b",
-            "4k3/R7/4K3/4P3/8/8/8/4r3 b - - 0 1",
+            newEndgamePosition("4k3/R7/4K3/4P3/8/8/8/4r3 b - - 0 1", "b"),
         );
         expect(book.position).toEqual("4k3/7R/8/4PK2/8/8/8/r7 b - - 0 1");
         book = removeEndgamePosition(book, book.positions[0].id);
@@ -70,13 +69,11 @@ describe("updating books", function () {
         let book = newEndgameBook("Rook endgames");
         book = addEndgamePosition(
             book,
-            "b",
-            "4k3/7R/8/4PK2/8/8/8/r7 b - - 0 1",
+            newEndgamePosition("4k3/7R/8/4PK2/8/8/8/r7 b - - 0 1", "b"),
         );
         book = addEndgamePosition(
             book,
-            "b",
-            "4k3/R7/4K3/4P3/8/8/8/4r3 b - - 0 1",
+            newEndgamePosition("4k3/R7/4K3/4P3/8/8/8/4r3 b - - 0 1", "b"),
         );
         expect(book.positions.length).toEqual(2);
         expect(book.lineCount).toEqual(0);

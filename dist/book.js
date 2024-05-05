@@ -142,17 +142,11 @@ exports.newEndgamePosition = newEndgamePosition;
 /**
  * Add a position to an endgame book
  */
-function addEndgamePosition(book, color, position) {
-    const newPosition = {
-        id: (0, uuid_1.v4)(),
-        position,
-        color,
-        rootNode: newNode(),
-    };
+function addEndgamePosition(book, position) {
     return {
         ...book,
-        positions: [...book.positions, newPosition],
-        position: book.positions.length == 0 ? newPosition.position : book.position,
+        positions: [...book.positions, position],
+        position: book.positions.length == 0 ? position.position : book.position,
     };
 }
 exports.addEndgamePosition = addEndgamePosition;

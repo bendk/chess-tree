@@ -275,20 +275,13 @@ export function newEndgamePosition(
  */
 export function addEndgamePosition(
     book: EndgameBook,
-    color: Color,
-    position: Position,
+    position: EndgamePosition,
 ): EndgameBook {
-    const newPosition = {
-        id: uuidv4(),
-        position,
-        color,
-        rootNode: newNode(),
-    };
     return {
         ...book,
-        positions: [...book.positions, newPosition],
+        positions: [...book.positions, position],
         position:
-            book.positions.length == 0 ? newPosition.position : book.position,
+            book.positions.length == 0 ? position.position : book.position,
     };
 }
 
