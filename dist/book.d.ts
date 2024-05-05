@@ -152,6 +152,10 @@ export declare enum Priority {
  */
 export declare function newOpeningBook(name: string, color: Color, initialMoves: Move[]): OpeningBook;
 /**
+ * Update an opening book
+ */
+export declare function updateOpening(book: OpeningBook, rootNode: Node): OpeningBook;
+/**
  * Create a new endgame book
  */
 export declare function newEndgameBook(name: string): EndgameBook;
@@ -163,6 +167,10 @@ export declare function newEndgamePosition(position: string, color: "w" | "b"): 
  * Add a position to an endgame book
  */
 export declare function addEndgamePosition(book: EndgameBook, color: Color, position: Position): EndgameBook;
+/**
+ * Update a position from an endgame book
+ */
+export declare function updateEndgamePosition(book: EndgameBook, positionId: string, rootNode: Node): EndgameBook;
 /**
  * Remove a position from an endgame book
  */

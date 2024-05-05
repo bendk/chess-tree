@@ -19,6 +19,7 @@ export {
     Priority,
     SplitNode,
     addEndgamePosition,
+    addLine,
     childCount,
     combineNodes,
     getDescendant,
@@ -31,6 +32,8 @@ export {
     newOpeningBook,
     removeEndgamePosition,
     splitNode,
+    updateEndgamePosition,
+    updateOpening,
 } from "./book";
 export {
     ViewNode,

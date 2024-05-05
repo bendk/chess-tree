@@ -240,6 +240,13 @@ export function newOpeningBook(
 }
 
 /**
+ * Update an opening book
+ */
+export function updateOpening(book: OpeningBook, rootNode: Node): OpeningBook {
+    return { ...book, rootNode, lineCount: lineCount(rootNode) };
+}
+
+/**
  * Create a new endgame book
  */
 export function newEndgameBook(name: string): EndgameBook {
@@ -271,15 +278,42 @@ export function addEndgamePosition(
     color: Color,
     position: Position,
 ): EndgameBook {
-    return updatePositions(book, (positions) => [
-        ...positions,
-        {
-            id: uuidv4(),
-            position,
-            color,
-            rootNode: newNode(),
-        },
-    ]);
+    const newPosition = {
+        id: uuidv4(),
+        position,
+        color,
+        rootNode: newNode(),
+    };
+    return {
+        ...book,
+        positions: [...book.positions, newPosition],
+        position:
+            book.positions.length == 0 ? newPosition.position : book.position,
+    };
+}
+
+/**
+ * Update a position from an endgame book
+ */
+export function updateEndgamePosition(
+    book: EndgameBook,
+    positionId: string,
+    rootNode: Node,
+): EndgameBook {
+    let newLineCount = book.lineCount;
+    const newPositions = book.positions.map((position) => {
+        if (position.id == positionId) {
+            newLineCount += lineCount(rootNode) - lineCount(position.rootNode);
+            return { ...position, rootNode };
+        } else {
+            return position;
+        }
+    });
+    return {
+        ...book,
+        positions: newPositions,
+        lineCount: newLineCount,
+    };
 }
 
 /**
@@ -289,18 +323,21 @@ export function removeEndgamePosition(
     book: EndgameBook,
     positionId: string,
 ): EndgameBook {
-    return updatePositions(book, (positions) =>
-        positions.filter((p) => p.id != positionId),
-    );
-}
-
-function updatePositions(
-    book: EndgameBook,
-    operation: (positions: EndgamePosition[]) => EndgamePosition[],
-): EndgameBook {
-    const positions = operation(book.positions);
-    const position = positions[0]?.position ?? GENERIC_ENDGAME;
-    return { ...book, positions, position };
+    let newLineCount = book.lineCount;
+    const newPositions = book.positions.filter((position) => {
+        if (position.id === positionId) {
+            newLineCount -= lineCount(position.rootNode);
+            return false;
+        } else {
+            return true;
+        }
+    });
+    return {
+        ...book,
+        position: newPositions[0]?.position ?? GENERIC_ENDGAME,
+        positions: newPositions,
+        lineCount: newLineCount,
+    };
 }
 
 export function newNode(): Node {
@@ -379,12 +416,13 @@ function movesRelativeToOpeningBook(
  * Get the total number of lines for a node
  */
 export function lineCount(node: Node): number {
-    if (childCount(node) == 0) {
-        return 1;
-    }
     let count = 0;
     for (const [_, child] of Object.entries(node.children)) {
-        count += lineCount(child);
+        if (childCount(child) == 0) {
+            count += 1;
+        } else {
+            count += lineCount(child);
+        }
     }
     return count;
 }
@@ -497,8 +535,16 @@ export function moveLine(
         delete sourceCursor.current.children[lastSourceMove];
     }
     return [
-        { ...source, rootNode: sourceNewRoot, lineCount: lineCount(sourceNewRoot) },
-        { ...destination, rootNode: destNewRoot, lineCount: lineCount(destNewRoot) },
+        {
+            ...source,
+            rootNode: sourceNewRoot,
+            lineCount: lineCount(sourceNewRoot),
+        },
+        {
+            ...destination,
+            rootNode: destNewRoot,
+            lineCount: lineCount(destNewRoot),
+        },
     ];
 }
 

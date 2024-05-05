@@ -12,6 +12,8 @@ import {
     moveLine,
     removeEndgamePosition,
     splitNode,
+    updateOpening,
+    updateEndgamePosition,
     Priority,
 } from "./book";
 import { buildNode } from "./testutil";
@@ -46,31 +48,97 @@ describe("how the position field gets set", () => {
     });
 });
 
-test("addLine", () => {
-    const node = newNode();
-    const updated = addLine(node, ["e4", "e5", "Nf3"]);
-    expect(updated).toEqual(
-        buildNode({
-            e4: {
+describe("updating books", function () {
+    test("updating opening books", function () {
+        const source = newOpeningBook("e4", "w", ["e4"]);
+        expect(source.lineCount).toEqual(0);
+        const updated = updateOpening(
+            source,
+            buildNode({
                 e5: {
                     Nf3: {},
                 },
-            },
-        }),
-    );
-    // Node shouldn't be updated
-    expect(node).toEqual(buildNode({}));
-    const updated2 = addLine(updated, ["e4", "e5", "Nc3"]);
-    expect(updated2).toEqual(
-        buildNode({
-            e4: {
-                e5: {
+                c5: {
                     Nf3: {},
-                    Nc3: {},
                 },
-            },
-        }),
-    );
+            }),
+        );
+        expect(updated.lineCount).toEqual(2);
+    });
+
+    test("update endgame books", function () {
+        let book = newEndgameBook("Rook endgames");
+        book = addEndgamePosition(
+            book,
+            "b",
+            "4k3/7R/8/4PK2/8/8/8/r7 b - - 0 1",
+        );
+        book = addEndgamePosition(
+            book,
+            "b",
+            "4k3/R7/4K3/4P3/8/8/8/4r3 b - - 0 1",
+        );
+        expect(book.positions.length).toEqual(2);
+        expect(book.lineCount).toEqual(0);
+        book = updateEndgamePosition(
+            book,
+            book.positions[0].id,
+            buildNode({
+                Ra6: {
+                    e6: {
+                        Ra1: {},
+                    },
+                    Rg7: {
+                        Rb6: {},
+                    },
+                },
+            }),
+        );
+        expect(book.lineCount).toEqual(2);
+        book = updateEndgamePosition(
+            book,
+            book.positions[1].id,
+            buildNode({
+                Kf7: {
+                    Ra8: {
+                        Kg7: {},
+                    },
+                },
+            }),
+        );
+        expect(book.positions.length).toEqual(2);
+        expect(book.lineCount).toEqual(3);
+        book = removeEndgamePosition(book, book.positions[0].id);
+        expect(book.positions.length).toEqual(1);
+        expect(book.lineCount).toEqual(1);
+    });
+
+    test("addLine", () => {
+        const node = newNode();
+        const updated = addLine(node, ["e4", "e5", "Nf3"]);
+        expect(updated).toEqual(
+            buildNode({
+                e4: {
+                    e5: {
+                        Nf3: {},
+                    },
+                },
+            }),
+        );
+        // Node shouldn't be updated
+        expect(node).toEqual(buildNode({}));
+        const updated2 = addLine(updated, ["e4", "e5", "Nc3"]);
+        expect(updated2).toEqual(
+            buildNode({
+                e4: {
+                    e5: {
+                        Nf3: {},
+                        Nc3: {},
+                    },
+                },
+            }),
+        );
+    });
 });
 
 describe("moveLine", () => {
@@ -108,8 +176,8 @@ describe("moveLine", () => {
                 },
             }),
         );
-        expect(newSource.lineCount).toEqual(1)
-        expect(newDest.lineCount).toEqual(2)
+        expect(newSource.lineCount).toEqual(1);
+        expect(newDest.lineCount).toEqual(2);
     });
 
     test("merging moves", () => {
@@ -263,7 +331,7 @@ describe("utility functions", () => {
         expect(lineCount(getDescendant(node, ["e5", "Nf3", "Nc6"])!)).toEqual(
             1,
         );
-        expect(lineCount(getDescendant(node, ["e6"])!)).toEqual(1);
+        expect(lineCount(getDescendant(node, ["e6"])!)).toEqual(0);
     });
 
     test("lineCountByPriority", () => {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.combineNodes = exports.splitNode = exports.NodeCursor = exports.moveLine = exports.addLine = exports.lineCountByPriority = exports.lineCount = exports.getNodePath = exports.getDescendant = exports.getSingleChild = exports.childCount = exports.newNode = exports.removeEndgamePosition = exports.addEndgamePosition = exports.newEndgamePosition = exports.newEndgameBook = exports.newOpeningBook = exports.Priority = exports.nagText = exports.POSITION_NAGS = exports.MOVE_NAGS = exports.Nag = void 0;
+exports.combineNodes = exports.splitNode = exports.NodeCursor = exports.moveLine = exports.addLine = exports.lineCountByPriority = exports.lineCount = exports.getNodePath = exports.getDescendant = exports.getSingleChild = exports.childCount = exports.newNode = exports.removeEndgamePosition = exports.updateEndgamePosition = exports.addEndgamePosition = exports.newEndgamePosition = exports.newEndgameBook = exports.updateOpening = exports.newOpeningBook = exports.Priority = exports.nagText = exports.POSITION_NAGS = exports.MOVE_NAGS = exports.Nag = void 0;
 const uuid_1 = require("uuid");
 const chessLogic_1 = require("./chessLogic");
 /**
@@ -112,6 +112,13 @@ function newOpeningBook(name, color, initialMoves) {
 }
 exports.newOpeningBook = newOpeningBook;
 /**
+ * Update an opening book
+ */
+function updateOpening(book, rootNode) {
+    return { ...book, rootNode, lineCount: lineCount(rootNode) };
+}
+exports.updateOpening = updateOpening;
+/**
  * Create a new endgame book
  */
 function newEndgameBook(name) {
@@ -136,30 +143,63 @@ exports.newEndgamePosition = newEndgamePosition;
  * Add a position to an endgame book
  */
 function addEndgamePosition(book, color, position) {
-    return updatePositions(book, (positions) => [
-        ...positions,
-        {
-            id: (0, uuid_1.v4)(),
-            position,
-            color,
-            rootNode: newNode(),
-        },
-    ]);
+    const newPosition = {
+        id: (0, uuid_1.v4)(),
+        position,
+        color,
+        rootNode: newNode(),
+    };
+    return {
+        ...book,
+        positions: [...book.positions, newPosition],
+        position: book.positions.length == 0 ? newPosition.position : book.position,
+    };
 }
 exports.addEndgamePosition = addEndgamePosition;
+/**
+ * Update a position from an endgame book
+ */
+function updateEndgamePosition(book, positionId, rootNode) {
+    let newLineCount = book.lineCount;
+    const newPositions = book.positions.map((position) => {
+        if (position.id == positionId) {
+            newLineCount += lineCount(rootNode) - lineCount(position.rootNode);
+            return { ...position, rootNode };
+        }
+        else {
+            return position;
+        }
+    });
+    return {
+        ...book,
+        positions: newPositions,
+        lineCount: newLineCount,
+    };
+}
+exports.updateEndgamePosition = updateEndgamePosition;
 /**
  * Remove a position from an endgame book
  */
 function removeEndgamePosition(book, positionId) {
-    return updatePositions(book, (positions) => positions.filter((p) => p.id != positionId));
+    var _a, _b;
+    let newLineCount = book.lineCount;
+    const newPositions = book.positions.filter((position) => {
+        if (position.id === positionId) {
+            newLineCount -= lineCount(position.rootNode);
+            return false;
+        }
+        else {
+            return true;
+        }
+    });
+    return {
+        ...book,
+        position: (_b = (_a = newPositions[0]) === null || _a === void 0 ? void 0 : _a.position) !== null && _b !== void 0 ? _b : GENERIC_ENDGAME,
+        positions: newPositions,
+        lineCount: newLineCount,
+    };
 }
 exports.removeEndgamePosition = removeEndgamePosition;
-function updatePositions(book, operation) {
-    var _a, _b;
-    const positions = operation(book.positions);
-    const position = (_b = (_a = positions[0]) === null || _a === void 0 ? void 0 : _a.position) !== null && _b !== void 0 ? _b : GENERIC_ENDGAME;
-    return { ...book, positions, position };
-}
 function newNode() {
     return {
         children: {},
@@ -232,12 +272,14 @@ function movesRelativeToOpeningBook(source, moves) {
  * Get the total number of lines for a node
  */
 function lineCount(node) {
-    if (childCount(node) == 0) {
-        return 1;
-    }
     let count = 0;
     for (const [_, child] of Object.entries(node.children)) {
-        count += lineCount(child);
+        if (childCount(child) == 0) {
+            count += 1;
+        }
+        else {
+            count += lineCount(child);
+        }
     }
     return count;
 }
@@ -325,8 +367,16 @@ function moveLine(source, destination, moves) {
         delete sourceCursor.current.children[lastSourceMove];
     }
     return [
-        { ...source, rootNode: sourceNewRoot, lineCount: lineCount(sourceNewRoot) },
-        { ...destination, rootNode: destNewRoot, lineCount: lineCount(destNewRoot) },
+        {
+            ...source,
+            rootNode: sourceNewRoot,
+            lineCount: lineCount(sourceNewRoot),
+        },
+        {
+            ...destination,
+            rootNode: destNewRoot,
+            lineCount: lineCount(destNewRoot),
+        },
     ];
 }
 exports.moveLine = moveLine;
