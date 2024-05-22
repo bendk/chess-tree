@@ -9,10 +9,6 @@ const book_1 = require("./book");
  * user too much at once.
  */
 function viewNodeTree(params) {
-    return doViewNodeTree(params);
-}
-exports.viewNodeTree = viewNodeTree;
-function doViewNodeTree(params) {
     // Create a fully-expanded node tree
     let result = {
         leadingMoves: [],
@@ -29,7 +25,11 @@ function doViewNodeTree(params) {
     for (const move of params.moves) {
         const child = result.childNodes.find((child) => child.move === move);
         if (child === undefined) {
-            throw Error(`Child not found (moves: ${params.moves}, move: ${move})`);
+            // Move not present in the node tree, stop advancing
+            break;
+            // throw Error(
+            //     `Child not found (moves: ${params.moves}, move: ${move})`,
+            // );
         }
         result = {
             leadingMoves: [...result.leadingMoves, move],
@@ -63,6 +63,7 @@ function doViewNodeTree(params) {
         childNodes: expandedChildNodes.map((node) => truncateChildren(node, 0)),
     };
 }
+exports.viewNodeTree = viewNodeTree;
 /**
  * Does the work to convert a node tree to a (fully-expanded) view node tree
  */

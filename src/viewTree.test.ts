@@ -398,3 +398,222 @@ test("hitting line limit", () => {
         nags: [],
     });
 });
+
+test("hitting line limit", () => {
+    // As the maxLines decreases, the previous moves should dissapear
+    expect(
+        viewNodeTree({
+            rootNode: testNode,
+            moves: ["e4", "c5"],
+            maxBranches: 5,
+            maxDepth: 7,
+        }),
+    ).toEqual({
+        leadingMoves: ["e4"],
+        childNodes: [
+            buildViewNode("e5", {
+                Nf3: { Nc6: {} },
+                Bc4: { Nf6: {} },
+            }),
+            buildViewNode("c5", {
+                Nf3: {
+                    d6: {
+                        d4: {
+                            cxd4: {
+                                Nxd4: {},
+                                Qxd4: {},
+                            },
+                        },
+                    },
+                },
+                d4: { cxd4: {} },
+            }),
+        ],
+        comment: "",
+        annotations: {
+            arrows: [],
+            squares: [],
+        },
+        nags: [],
+    });
+    expect(
+        viewNodeTree({
+            rootNode: testNode,
+            moves: ["e4", "c5"],
+            maxBranches: 5,
+            maxDepth: 7,
+        }),
+    ).toEqual({
+        leadingMoves: ["e4"],
+        childNodes: [
+            buildViewNode("e5", {
+                Nf3: { Nc6: {} },
+                Bc4: { Nf6: {} },
+            }),
+            buildViewNode("c5", {
+                Nf3: {
+                    d6: {
+                        d4: {
+                            cxd4: {
+                                Nxd4: {},
+                                Qxd4: {},
+                            },
+                        },
+                    },
+                },
+                d4: { cxd4: {} },
+            }),
+        ],
+        comment: "",
+        annotations: {
+            arrows: [],
+            squares: [],
+        },
+        nags: [],
+    });
+    expect(
+        viewNodeTree({
+            rootNode: testNode,
+            moves: ["e4", "c5"],
+            maxBranches: 3,
+            maxDepth: 7,
+        }),
+    ).toEqual({
+        leadingMoves: ["e4", "c5"],
+        childNodes: [
+            buildViewNode("Nf3", {
+                d6: {
+                    d4: {
+                        cxd4: {
+                            Nxd4: {},
+                            Qxd4: {},
+                        },
+                    },
+                },
+            }),
+            buildViewNode("d4", { cxd4: {} }),
+        ],
+        comment: "",
+        annotations: {
+            arrows: [],
+            squares: [],
+        },
+        nags: [],
+    });
+    expect(
+        viewNodeTree({
+            rootNode: testNode,
+            moves: ["e4", "c5"],
+            maxBranches: 2,
+            maxDepth: 7,
+        }),
+    ).toEqual({
+        leadingMoves: ["e4", "c5"],
+        childNodes: [
+            buildViewNode("Nf3", {
+                d6: {
+                    d4: {
+                        cxd4: 2,
+                    },
+                },
+            }),
+            buildViewNode("d4", { cxd4: {} }),
+        ],
+        comment: "",
+        annotations: {
+            arrows: [],
+            squares: [],
+        },
+        nags: [],
+    });
+    expect(
+        viewNodeTree({
+            rootNode: testNode,
+            moves: ["e4", "c5"],
+            maxBranches: 1,
+            maxDepth: 7,
+        }),
+    ).toEqual({
+        leadingMoves: ["e4", "c5"],
+        childNodes: [buildViewNode("Nf3", 2), buildViewNode("d4", 1)],
+        comment: "",
+        annotations: {
+            arrows: [],
+            squares: [],
+        },
+        nags: [],
+    });
+});
+
+test("Moves not in the root node", () => {
+    // 1. e4 Nf6 is not present in the root tree.  We should stop at e4 and display that.
+    expect(
+        viewNodeTree({
+            rootNode: testNode,
+            moves: ["e4", "Nf6"],
+            maxBranches: 5,
+            maxDepth: 7,
+        }),
+    ).toEqual({
+        leadingMoves: ["e4"],
+        childNodes: [
+            buildViewNode("e5", {
+                Nf3: { Nc6: {} },
+                Bc4: { Nf6: {} },
+            }),
+            buildViewNode("c5", {
+                Nf3: {
+                    d6: {
+                        d4: {
+                            cxd4: {
+                                Nxd4: {},
+                                Qxd4: {},
+                            },
+                        },
+                    },
+                },
+                d4: { cxd4: {} },
+            }),
+        ],
+        comment: "",
+        annotations: {
+            arrows: [],
+            squares: [],
+        },
+        nags: [],
+    });
+
+    // Test the same thing, but when we need to truncate a lines
+    expect(
+        viewNodeTree({
+            rootNode: testNode,
+            moves: ["e4", "Nf6"],
+            maxBranches: 4,
+            maxDepth: 7,
+        }),
+    ).toEqual({
+        leadingMoves: ["e4"],
+        childNodes: [
+            buildViewNode("e5", {
+                Nf3: { Nc6: {} },
+                Bc4: { Nf6: {} },
+            }),
+            buildViewNode("c5", {
+                Nf3: {
+                    d6: {
+                        d4: {
+                            cxd4: 2,
+                        },
+                    },
+                },
+                d4: { cxd4: {} },
+            }),
+        ],
+        comment: "",
+        annotations: {
+            arrows: [],
+            squares: [],
+        },
+        nags: [],
+    });
+});
